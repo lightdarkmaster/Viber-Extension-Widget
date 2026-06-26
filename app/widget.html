@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Viber Chat</title>
+    <link rel="stylesheet" href="./css/widget.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://live.zwidgets.com/js-sdk/1.4/ZohoEmbededAppSDK.min.js"></script>
+</head>
+<body>
+
+<div class="app" id="app">
+
+    <!-- ══════════════════════════════════════
+         HEADER — customer info + controls
+    ══════════════════════════════════════ -->
+    <header class="chat-header" id="chatHeader">
+
+        <!-- Left: avatar + customer info -->
+        <div class="header-customer">
+            <div class="avatar" id="headerAvatar">
+                <span id="headerAvatarInitial">?</span>
+                <span class="avatar-status" id="avatarStatus" title="Connection status"></span>
+            </div>
+            <div class="header-info">
+                <div class="header-name" id="headerName">Loading…</div>
+                <div class="header-phone" id="headerPhone">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1.2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 9a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    <span id="headerPhoneText">—</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Centre: unread badge + search toggle -->
+        <div class="header-centre">
+            <span class="unread-badge" id="unreadBadge" style="display:none;">0</span>
+        </div>
+
+        <!-- Right: action buttons -->
+        <div class="header-actions">
+            <!-- Search toggle -->
+            <button class="icon-btn" id="btnSearch" title="Search messages" aria-label="Search messages">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </button>
+            <!-- Refresh -->
+            <button class="icon-btn" id="btnRefresh" title="Refresh conversation" aria-label="Refresh">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+            </button>
+            <!-- Dark mode toggle -->
+            <button class="icon-btn" id="btnTheme" title="Toggle dark mode" aria-label="Toggle theme">
+                <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            </button>
+        </div>
+
+    </header>
+
+    <!-- Search bar (hidden by default) -->
+    <div class="search-bar" id="searchBar" style="display:none;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" placeholder="Search messages…" autocomplete="off" aria-label="Search messages">
+        <button class="search-clear" id="searchClear" aria-label="Clear search">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <span class="search-count" id="searchCount"></span>
+    </div>
+
+    <!-- Connection status bar -->
+    <div class="conn-bar" id="connBar">
+        <span class="conn-dot" id="connDot"></span>
+        <span id="connText">Connecting…</span>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         BODY — scrollable messages
+    ══════════════════════════════════════ -->
+    <main class="chat-body" id="chatBody" role="log" aria-live="polite" aria-label="Conversation">
+
+        <!-- Load more trigger (top) -->
+        <div class="load-more-wrap" id="loadMoreWrap" style="display:none;">
+            <button class="load-more-btn" id="btnLoadMore">Load earlier messages</button>
+        </div>
+
+        <!-- Loading state -->
+        <div class="state-center" id="stateLoading">
+            <div class="spinner-viber"></div>
+            <p>Loading conversation…</p>
+        </div>
+
+        <!-- Error state -->
+        <div class="state-center state-error" id="stateError" style="display:none;">
+            <div class="state-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <p id="stateErrorMsg">Unable to load messages.</p>
+            <button class="retry-btn" id="btnRetry">Try again</button>
+        </div>
+
+        <!-- Empty state (new conversation) -->
+        <div class="state-center state-empty" id="stateEmpty" style="display:none;">
+            <div class="empty-viber-logo">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                    <rect width="48" height="48" rx="14" fill="var(--viber)"/>
+                    <path d="M24 10c-8.284 0-15 6.056-15 13.524 0 4.27 2.133 8.08 5.464 10.612V38l4.9-2.694A16.74 16.74 0 0 0 24 35.524c8.284 0 15-5.386 15-12.854C39 15.19 32.284 10 24 10z" fill="white" opacity=".95"/>
+                    <path d="M28.5 27.5c-.4.4-.85.6-1.3.6-.2 0-.45-.05-.65-.15-1.3-.55-2.55-1.35-3.65-2.45-1.1-1.1-1.9-2.35-2.45-3.65-.2-.5-.1-1.05.25-1.4l.75-.75c.35-.35.35-.9 0-1.25l-2-2c-.35-.35-.9-.35-1.25 0l-.75.75c-.75.75-.95 1.85-.55 2.8 1.15 2.7 3.1 5.1 5.65 7.1 1.4 1.05 3 1.95 4.8 2.6.95.35 2 .1 2.7-.6l.75-.75c.35-.35.35-.9 0-1.25l-2-2c-.35-.35-.9-.35-1.25 0l-.75.75z" fill="var(--viber)"/>
+                </svg>
+            </div>
+            <p class="empty-title">No messages yet</p>
+            <p class="empty-sub">Send the first message to start a Viber conversation.</p>
+        </div>
+
+        <!-- Messages container -->
+        <div class="messages" id="messages"></div>
+
+        <!-- Typing indicator -->
+        <div class="typing-indicator" id="typingIndicator" style="display:none;">
+            <div class="typing-bubble">
+                <span></span><span></span><span></span>
+            </div>
+            <span class="typing-label">Customer is typing…</span>
+        </div>
+
+    </main>
+
+    <!-- Scroll-to-bottom FAB -->
+    <button class="scroll-fab" id="scrollFab" style="display:none;" aria-label="Scroll to latest">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        <span class="fab-badge" id="fabBadge" style="display:none;">0</span>
+    </button>
+
+    <!-- ══════════════════════════════════════
+         FOOTER — composer
+    ══════════════════════════════════════ -->
+    <footer class="chat-footer" id="chatFooter">
+
+        <!-- Attachment preview strip -->
+        <div class="attachment-preview" id="attachmentPreview" style="display:none;">
+            <div class="attachment-list" id="attachmentList"></div>
+            <button class="att-clear-all" id="attClearAll" title="Remove all attachments">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+
+        <!-- Composer row -->
+        <div class="composer">
+
+            <!-- Attachment button -->
+            <button class="composer-btn att-btn" id="btnAttach" title="Attach file" aria-label="Attach file">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            </button>
+            <input type="file" id="fileInput" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" style="display:none;" aria-hidden="true">
+
+            <!-- Text input -->
+            <div class="textarea-wrap">
+                <textarea
+                    id="msgInput"
+                    placeholder="Type a message…"
+                    rows="1"
+                    maxlength="7000"
+                    aria-label="Message"
+                    aria-multiline="true"
+                ></textarea>
+            </div>
+
+            <!-- Char count (shown when nearing limit) -->
+            <span class="char-count" id="charCount" style="display:none;"></span>
+
+            <!-- Send button -->
+            <button class="composer-btn send-btn" id="btnSend" title="Send message" aria-label="Send" disabled>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+
+        </div>
+
+    </footer>
+
+</div><!-- /.app -->
+
+<!-- Toast notification -->
+<div class="toast-wrap" id="toastWrap" aria-live="assertive"></div>
+
+<script src="./scripts/scripts.js"></script>
+</body>
+</html>

@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title id="pageTitle">Devtac Messaging – Settings</title>
+  <script src="https://live.zwidgets.com/js-sdk/1.4/ZohoEmbededAppSDK.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="brand-mark">
+   <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M24 8C14.06 8 6 15.39 6 24.45c0 5.27 2.67 9.97 6.83 13.07V42l5.04-2.77A19.2 19.2 0 0024 40.45c9.94 0 18-6.72 18-15.55C42 15.82 33.94 8 24 8z"
+        fill="white" opacity=".95"/>
+  <path d="M30.5 29c-.45.45-.96.68-1.47.68-.23 0-.51-.06-.74-.17-1.47-.63-2.88-1.53-4.12-2.77-1.24-1.24-2.14-2.65-2.77-4.12-.23-.57-.11-1.19.28-1.58l.85-.85c.4-.4.4-1.02 0-1.41l-2.26-2.26c-.4-.4-1.02-.4-1.41 0l-.85.85c-.85.85-1.07 2.09-.62 3.16 1.3 3.05 3.5 5.76 6.38 8.02 1.58 1.19 3.39 2.2 5.42 2.94 1.07.4 2.26.11 3.05-.68l.85-.85c.4-.4.4-1.02 0-1.41l-2.26-2.26c-.4-.4-1.02-.4-1.41 0l-.92.71z"
+        fill="#7360f2"/>
+  <path d="M27 17h2.5A3.5 3.5 0 0133 20.5V21" stroke="#7360f2" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M27 20.5h1A1.5 1.5 0 0129.5 22v.5" stroke="#7360f2" stroke-width="1.8" stroke-linecap="round"/>
+</svg>
+  </div>
+  <div class="header-text">
+    <h1 id="widgetTitle">Devtac Messaging</h1>
+    <p>Extension settings &amp; license configuration</p>
+  </div>
+<div class="header-right">
+    <div class="devtac-badge">by <span class="dt">Devtac</span></div>
+</div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('settings', this)">Settings</button>
+  <button class="tab-btn" onclick="switchTab('advanced', this)">Getting Started</button>
+  <button class="tab-btn" onclick="switchTab('info', this)">Extension Info</button>
+</div>
+
+<!-- Tab 1: Settings -->
+<div class="tab-pane active" id="tab-settings">
+
+  <!-- Viber Credit Balance -->
+  <div class="card">
+    <div class="card-label" id="creditCardLabel">Viber Credit Balance</div>
+    <div class="balance-row">
+      <div>
+        <div class="balance-amount"><span id="credit-val">—</span></div>
+      </div>
+      <div class="balance-right">
+        <!-- <div class="balance-active">
+          <span class="dot"></span>Active
+        </div> -->
+        <button class="refresh-btn-sm" onclick="refreshBalance()">
+          <svg id="refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+          </svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="threshold-alert" id="thresholdAlert">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+      </svg>
+      <div>
+        <strong>Message Threshold Reached</strong>
+        Your Viber message limit has been reached. Please contact us to top up your credits or upgrade your plan to continue sending messages.
+      </div>
+    </div>
+  </div>
+
+  <!-- License -->
+  <div class="card">
+    <div class="card-label">License</div>
+
+    <div class="field-group">
+      <label>Trial Status</label>
+      <div id="trial-status-wrap">
+        <span class="trial-tag licensed">
+          <span class="dot"></span>
+          <span id="trial-status-text">Loading…</span>
+        </span>
+      </div>
+      <div class="field-hint" id="trial-hint" style="margin-top:6px;"></div>
+    </div>
+
+    <div class="field-group">
+      <label for="license-key">License Key</label>
+      <div class="key-input-wrap">
+        <svg class="pfx" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="3" y="11" width="18" height="11" rx="2"/>
+          <path d="M7 11V7a5 5 0 0110 0v4"/>
+        </svg>
+        <input
+                class="key-input"
+                type="password"
+                id="license-key"
+                placeholder="DM-XXXXXXXX-XXXXXXXX-XXXXXXXX-…"
+                autocomplete="off"
+                spellcheck="false"
+                oninput="onKeyInput()"
+        />
+        <button class="toggle-vis" onclick="toggleVis()" title="Show / hide">
+          <svg id="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+      <div class="key-status" id="key-status">
+        <span class="dot"></span>
+        <span id="key-status-text"></span>
+      </div>
+      <div class="field-hint">Format: DM-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX</div>
+    </div>
+  </div>
+
+  <!-- Chat Preferences -->
+  <div class="card">
+    <div class="card-label">Chat Preferences</div>
+    <div class="field-group">
+      <label for="msg-per-load">Messages Per Load</label>
+      <input
+              class="num-input"
+              type="number"
+              id="msg-per-load"
+              min="5"
+              max="100"
+              value="20"
+              placeholder="20"
+      />
+      <div class="field-hint">Number of messages loaded each time "Load More" is tapped in the chat widget. Min: 5 · Max: 100</div>
+    </div>
+  </div>
+
+  <!-- Pop-up Reminder Notification -->
+  <div class="card">
+    <div class="card-label">Pop-up Reminder Notification</div>
+    <div class="field-group">
+      <label>Enable Pop-up Reminder</label>
+      <div class="toggle-row">
+        <button
+                class="toggle-btn"
+                id="popup-toggle"
+                onclick="togglePopUp()"
+                aria-pressed="false"
+        >
+          <span class="toggle-knob"></span>
+        </button>
+        <span class="toggle-label" id="popup-toggle-label">Disabled</span>
+      </div>
+      <div class="field-hint">When enabled, a pop-up reminder will be triggered whenever a new inbound message is received in the chat widget.</div>
+    </div>
+
+    <div class="field-group" id="popup-interval-group" style="display:none;">
+      <label for="popup-interval">Pop-up Reminder Interval <span class="field-unit">(minutes)</span></label>
+      <input
+              class="num-input"
+              type="number"
+              id="popup-interval"
+              min="0"
+              value="0"
+              placeholder="0"
+      />
+      <div class="field-hint">Sets how many minutes must pass since the last inbound message from the same sender before a new pop-up reminder is triggered. For example, if set to <strong>5</strong>, a pop-up will only appear if the previous message from that sender was received more than 5 minutes ago. Set to <strong>0</strong> to always show a pop-up for every inbound message.</div>
+    </div>
+  </div>
+
+  <button id="submitBtn" onclick="saveSettings()">
+    <svg viewBox="0 0 24 24"><path d="M17 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V7l-4-4zm-5 16a3 3 0 110-6 3 3 0 010 6zm3-10H5V5h10v4z"/></svg>
+    Save Configuration
+  </button>
+
+</div><!-- /tab-settings -->
+
+<!-- Tab 2: Getting Started -->
+<div class="tab-pane" id="tab-advanced">
+
+  <!-- Sub-section: Setting Up Viber Notifications -->
+  <div class="card">
+    <div class="card-label-icon">
+      <div class="card-label-icon-mark">📱</div>
+      <div>
+        <div class="card-label" id="gsNotifLabel">Setting Up Viber Notifications</div>
+        <div class="card-sublabel" id="gsNotifSublabel">Automate Viber messages via your CRM workflow rules</div>
+      </div>
+    </div>
+
+    <div class="gs-steps">
+
+      <div class="gs-step">
+        <div class="gs-num">1</div>
+        <div class="gs-body">
+          <div class="gs-title">Create a Message Template</div>
+          <div class="gs-desc">Go to <strong>Devtac Message Templates</strong> in your CRM and create a new Viber template. You can personalize messages using <strong>dynamic placeholders</strong> — special tags that automatically pull real data from the CRM record when the message is sent.</div>
+
+          <!-- HOW PLACEHOLDERS WORK -->
+          <div class="ph-block">
+            <div class="ph-block-header">How Placeholders Work</div>
+            <div class="ph-block-body">
+              <p class="ph-text">Wrap any CRM field's <strong>API name</strong> inside <code class="ph-code">${ }</code> to insert its value automatically. The API name is the internal identifier Zoho uses, it may look slightly different from the label shown on screen.</p>
+              <div class="ph-example-row"><span class="ph-label">Template:</span><span class="ph-val">Hello <code class="ph-code">${First_Name}</code>, your deal worth <code class="ph-code">${Amount}</code> has been updated.</span></div>
+              <div class="ph-example-row"><span class="ph-label">Sent as:</span><span class="ph-val ph-sent">Hello Juan, your deal worth ₱50,000 has been updated.</span></div>
+            </div>
+          </div>
+
+          <!-- TYPES OF DYNAMIC VALUES -->
+          <div class="ph-block">
+            <div class="ph-block-header">Types of Dynamic Values</div>
+            <div class="ph-block-body">
+              <p class="ph-subhead">a. Regular Fields</p>
+              <p class="ph-text">Any standard field on the record. Use the field's API name directly inside <code class="ph-code">${ }</code>.</p>
+              <div class="ph-codes"><div><code class="ph-code">${First_Name}</code> <span class="ph-dot">·</span> First name of the contact</div><div><code class="ph-code">${Phone}</code> <span class="ph-dot">·</span> Contact's phone number</div><div><code class="ph-code">${Deal_Stage}</code> <span class="ph-dot">·</span> Current stage of the deal</div></div>
+
+              <p class="ph-subhead">b. Name or Address Sub-fields</p>
+              <p class="ph-text">Some fields like Full Name or Address contain multiple parts. Target a specific part using a dot after the field's API name.</p>
+              <div class="ph-codes"><div><code class="ph-code">${Full_Name.first_name}</code> <span class="ph-dot">·</span> First name portion</div><div><code class="ph-code">${Full_Name.last_name}</code> <span class="ph-dot">·</span> Last name portion</div><div><code class="ph-code">${Mailing_Address.city}</code> <span class="ph-dot">·</span> City from mailing address</div></div>
+
+              <p class="ph-subhead">c. Lookup Fields</p>
+              <p class="ph-text">Some fields on a record link to another record in CRM (e.g. a Deal has an Account Name field that links to an Account). You can pull values from that linked record using the lookup field's API name followed by a dot and the field you want.</p>
+              <div class="ph-codes"><div><code class="ph-code">${Account_Name.Phone}</code> <span class="ph-dot">·</span> Phone from linked account</div><div><code class="ph-code">${Contact_Name.Email}</code> <span class="ph-dot">·</span> Email from linked contact</div></div>
+
+              <p class="ph-subhead">d. Current Date Values</p>
+              <p class="ph-text">These are built-in placeholders that insert today's date information automatically, no field setup needed.</p>
+              <div class="ph-codes"><div><code class="ph-code">${System.Current_Day}</code> <span class="ph-dot">·</span> Current day (e.g. 31)</div><div><code class="ph-code">${System.Current_Month}</code> <span class="ph-dot">·</span> Current month (e.g. March)</div><div><code class="ph-code">${System.Current_Year}</code> <span class="ph-dot">·</span> Current year (e.g. 2026)</div></div>
+
+              <p class="ph-subhead">e. Record ID</p>
+              <p class="ph-text">Inserts the unique ID of the CRM record. Useful for building links.</p>
+              <div class="ph-codes"><div><code class="ph-code">${Record_Id}</code> <span class="ph-dot">·</span> Unique ID of the record</div></div>
+            </div>
+          </div>
+
+          <!-- FINDING A FIELD'S API NAME -->
+          <div class="ph-block">
+            <div class="ph-block-header">Finding a Field's API Name</div>
+            <div class="ph-block-body">
+              <p class="ph-text">Dynamic values use the field's <strong>API name</strong>, not its display label. To find it, go to:<br><strong>Gear Icon (Top Right) → Developer Hub → APIs and SDKs → API Names tab</strong>, select your module and look for the API Name column next to each field.</p>
+              <table class="ph-table">
+                <thead><tr><th>Field Label</th><th>API Name to Use</th></tr></thead>
+                <tbody>
+                <tr><td>First Name</td><td><code class="ph-code">First_Name</code></td></tr>
+                <tr><td>Account Name</td><td><code class="ph-code">Account_Name</code></td></tr>
+                <tr><td>Closing Date</td><td><code class="ph-code">Closing_Date</code></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- TIP -->
+          <div class="ph-tip">
+            <p class="ph-tip-head">⚠️ Tip</p>
+            <p class="ph-tip-body">If a placeholder has a typo or the field has no value on that record, it will either fail to resolve or send as blank text. Always double-check API names and test with a real record before activating your workflow.</p>
+          </div>
+
+        </div>
+      </div>
+      <div class="gs-connector"></div>
+
+      <div class="gs-step">
+        <div class="gs-num">2</div>
+        <div class="gs-body">
+          <div class="gs-title">Set Up a Workflow Rule</div>
+          <div class="gs-desc">In <strong>Zoho CRM → Settings → Workflow Rules</strong>, create a rule on any module (e.g. Leads, Contacts, Deals). Set your trigger condition, such as a field update, record creation, or a scheduled date.</div>
+        </div>
+      </div>
+      <div class="gs-connector"></div>
+
+      <div class="gs-step">
+        <div class="gs-num">3</div>
+        <div class="gs-body">
+          <div class="gs-title">Add the Devtac Messaging Custom Action</div>
+          <div class="gs-desc" id="gsStep3Desc">In your workflow rule's <strong>Actions</strong> section, add a <strong>Custom Action</strong> and select <strong>Devtac Messaging</strong>. Choose your template, the phone field to send to, and the channel (Viber).</div>
+        </div>
+      </div>
+      <div class="gs-connector"></div>
+
+      <div class="gs-step">
+        <div class="gs-num">4</div>
+        <div class="gs-body">
+          <div class="gs-title">Viber Sends Automatically</div>
+          <div class="gs-desc" id="gsStep4Desc">Once the workflow rule triggers, the Viber is sent automatically — no manual action needed. You can monitor delivery logs in the <strong>Devtac Messaging Logs</strong> module in your CRM.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Sub-section: Showing the Chat Widget -->
+  <div class="card">
+    <div class="card-label-icon">
+      <div class="card-label-icon-mark">🗂️</div>
+      <div>
+        <div class="card-label">Showing the Chat Widget</div>
+        <div class="card-sublabel">Add the messaging panel to your CRM record pages</div>
+      </div>
+    </div>
+
+    <div class="gs-steps">
+
+      <div class="gs-step">
+        <div class="gs-num">1</div>
+        <div class="gs-body">
+          <div class="gs-title">Open a CRM Record</div>
+          <div class="gs-desc">Navigate to any record in the <strong>Leads, Contacts, or Deals</strong> module where you'd like the chat widget to appear.</div>
+        </div>
+      </div>
+      <div class="gs-connector"></div>
+
+      <div class="gs-step">
+        <div class="gs-num">2</div>
+        <div class="gs-body">
+          <div class="gs-title">Access the Related List Settings</div>
+          <div class="gs-desc">In the top-left section of the record page, hover your cursor over <strong>Related List</strong> to reveal the settings option.</div>
+        </div>
+      </div>
+      <div class="gs-connector"></div>
+
+      <div class="gs-step">
+        <div class="gs-num">3</div>
+        <div class="gs-body">
+          <div class="gs-title">Open the Configuration Pop-up</div>
+          <div class="gs-desc">Click <strong>Organize Potential Details</strong> to open the panel that controls which related lists are visible on the record.</div>
+        </div>
+      </div>
+      <div class="gs-connector"></div>
+
+      <div class="gs-step">
+        <div class="gs-num">4</div>
+        <div class="gs-body">
+          <div class="gs-title" id="gsWidgetStep4Title">Enable Devtac Viber Messaging</div>
+          <div class="gs-desc" id="gsWidgetStep4Desc">From the <strong>Unselected List</strong>, locate <strong>Devtac Viber Messaging</strong> and move it over to the <strong>Selected List</strong>.</div>
+        </div>
+      </div>
+      <div class="gs-connector"></div>
+
+      <div class="gs-step">
+        <div class="gs-num">5</div>
+        <div class="gs-body">
+          <div class="gs-title">Save and View the Widget</div>
+          <div class="gs-desc" id="gsWidgetStep5Desc">Click <strong>Save</strong>. The <strong>Devtac Viber Messaging</strong> widget will now appear on the record — ready for you to send messages directly from your CRM.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /tab-advanced -->
+
+<div class="tab-pane" id="tab-info">
+  <div class="card">
+    <div class="card-label">Extension Info</div>
+    <div class="info-row">
+      <span class="ik">Extension Version</span>
+      <span class="iv">v1.0.0</span>
+    </div>
+    <div class="info-row">
+      <span class="ik">Channel</span>
+      <span class="iv" id="infoChannel">Viber</span>
+    </div>
+    <div class="info-row">
+      <span class="ik">Publisher</span>
+      <span class="iv">Devtac CRM Inc.</span>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <span id="toast-icon">✓</span>
+  <span id="toast-msg">Saved</span>
+</div>
+
+<script type="module">
+  import { switchTab, toggleVis, onKeyInput, saveSettings, refreshBalance, togglePopUp } from './js/settings.js';
+  window.switchTab      = switchTab;
+  window.toggleVis      = toggleVis;
+  window.onKeyInput     = onKeyInput;
+  window.saveSettings   = saveSettings;
+  window.refreshBalance = refreshBalance;
+  window.togglePopUp    = togglePopUp;
+</script>
+<script type="module">
+  import { CONFIG } from "./js/config.js";
+  const n = CONFIG.WIDGET_NAME;
+  const c = CONFIG.CHANNEL;
+
+  document.getElementById("pageTitle").textContent        = n + " – Settings";
+  document.getElementById("widgetTitle").textContent      = n;
+  document.getElementById("creditCardLabel").textContent  = c + " Credit Balance";
+  document.getElementById("gsNotifLabel").textContent     = "Setting Up " + c + " Notifications";
+  document.getElementById("gsNotifSublabel").textContent  = "Automate " + c + " messages via your CRM workflow rules";
+  document.getElementById("gsStep3Desc").innerHTML        = `In your workflow rule's <strong>Actions</strong> section, add a <strong>Custom Action</strong> and select <strong>${n}</strong>. Choose your template and the phone field to send to.`;
+  document.getElementById("gsStep4Desc").innerHTML        = `Once the workflow rule triggers, the ${c} is sent automatically — no manual action needed. You can monitor delivery logs in the <strong>${n} Logs</strong> module in your CRM.`;
+  document.getElementById("gsWidgetStep4Title").textContent = "Enable " + n;
+  document.getElementById("gsWidgetStep4Desc").innerHTML  = `From the <strong>Unselected List</strong>, locate <strong>${n}</strong> and move it over to the <strong>Selected List</strong>.`;
+  document.getElementById("gsWidgetStep5Desc").innerHTML  = `Click <strong>Save</strong>. The <strong>${n}</strong> widget will now appear on the record — ready for you to send messages directly from your CRM.`;
+  document.getElementById("infoChannel").textContent      = c;
+</script>
+
+</body>
+</html>
