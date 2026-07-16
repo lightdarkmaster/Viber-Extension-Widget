@@ -579,7 +579,7 @@ body {
 /* ── Input row ── */
 .input-row {
     display: flex;
-    align-items: flex-end;
+    align-items: flex-start;
     gap: 8px;
 }
 
@@ -591,7 +591,7 @@ body {
 
 textarea#msgInput {
     width: 100%;
-    min-height: 64px; max-height: 120px;
+    min-height: 94px; max-height: 150px;
     resize: vertical;
     border: 1px solid var(--border);
     border-radius: 9px;
@@ -624,6 +624,7 @@ textarea#msgInput:disabled     { background: var(--bg); cursor: not-allowed; opa
 
 .send-col {
     display: flex; flex-direction: column; align-items: center; gap: 5px; flex-shrink: 0;
+    align-self: center;
 }
 
 .send-btn {
@@ -750,7 +751,92 @@ textarea#msgInput:disabled     { background: var(--bg); cursor: not-allowed; opa
 .toast.error   { background: #c0392b; }
 .toast.show    { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* ── Select2 overrides ── */
+/* ── Attach button ── */
+.attach-btn {
+    width: 34px; height: 28px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px; color: var(--muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s, border-color .15s, color .15s;
+    position: relative;
+}
+
+.attach-btn:hover      { background: var(--accent-lt); border-color: var(--border-hl); color: var(--viber); }
+.attach-btn.has-files  { background: var(--accent-lt); border-color: var(--viber); color: var(--viber); }
+.attach-btn svg         { width: 13px; height: 13px; }
+
+.attach-dot {
+    display: none;
+    position: absolute; top: -3px; right: -3px;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--success);
+    border: 1.5px solid var(--surface);
+}
+
+.attach-btn.has-files .attach-dot { display: block; }
+
+/* ── Attachment preview strip ── */
+.attachment-strip {
+    display: none;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 0 8px;
+}
+
+.attachment-strip.show { display: flex; }
+
+.attachment-chip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 190px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px 6px 4px 4px;
+}
+
+.attachment-chip-icon {
+    flex-shrink: 0;
+    width: 24px; height: 24px;
+    border-radius: 5px;
+    background: var(--tag-bg);
+    color: var(--tag-txt);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 7.5px; font-weight: 700; letter-spacing: .2px;
+}
+
+.attachment-chip-thumb {
+    flex-shrink: 0;
+    width: 24px; height: 24px;
+    border-radius: 5px;
+    object-fit: cover;
+}
+
+.attachment-chip-info { min-width: 0; display: flex; flex-direction: column; }
+
+.attachment-chip-name {
+    font-size: 10.5px; font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 110px;
+}
+
+.attachment-chip-size { font-size: 9px; color: var(--muted-lt); font-family: 'JetBrains Mono', monospace; }
+
+.attachment-chip-remove {
+    flex-shrink: 0;
+    background: none; border: none;
+    color: var(--muted-lt); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    padding: 2px; border-radius: 4px;
+    transition: color .15s, background .15s;
+}
+
+.attachment-chip-remove:hover { color: #e05252; background: rgba(224,82,82,.08); }
+.attachment-chip-remove svg { width: 10px; height: 10px; }
+
+
 .select2-container { width: 100% !important; }
 
 .select2-container--default .select2-selection--single {
