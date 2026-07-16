@@ -1705,6 +1705,64 @@ function sendMessage() {
     }
 }
 
+// Auto-send when a file is selected — no caption/text required
+function sendAttachmentsMessage(files) {
+    if (!files || !files.length) return;
+
+    if (!chat.activePhone || !chat.activePhone.resolvedNumber) {
+        console.warn("[DevtacMessaging] Cannot auto-send attachment: no active recipient number.");
+        return;
+    }
+
+    const validFiles = files.filter(f => f instanceof File);
+    if (!validFiles.length) return;
+
+    const lookupFieldsStr = (state.lookupFields || [])
+        .map(f => f.fieldApiName + "|" + f.relatedModule)
+        .join(",");
+
+    const params = {
+        record_id:             chat.recordId,
+        template_id:           "",
+        message:               "",
+        channel:               CONFIG.CHANNEL,
+        selected_module:       chat.module,
+        selected_module_label: chat.module,
+        phone_source:          chat.activePhone.source,
+        selected_field:        chat.activePhone.fieldApiName,
+        selected_field_label:  chat.activePhone.label,
+        lookup_field:          chat.activePhone.lookupField || "",
+        lookup_field_label:    chat.activePhone.lookupLabel || "",
+        lookup_fields:         lookupFieldsStr,
+        attachments:           []
+    };
+
+    const time = getNow();
+    const bubbleId = appendBubble({
+        dir:          "out",
+        text:         "",
+        time,
+        statusClass:  "sending",
+        retryParams:  params,
+        attachments:  validFiles
+    });
+
+    // Clear the strip immediately — we're sending now, not staging for later
+    if (window.DevtacAttachments) window.DevtacAttachments.clear();
+
+    Promise.all(validFiles.map(fileToBase64)).then((attachments) => {
+        params.attachments = attachments;
+        executeSend({ params, bubbleId, attachedFiles: validFiles });
+    });
+}
+
+document.addEventListener("attachments-added", (e) => {
+    const files = (e.detail && e.detail.files) || [];
+    sendAttachmentsMessage(files);
+});
+
+
+
 
 // function executeSend({ params, bubbleId, existingLogId }) {
 //     const body = existingLogId

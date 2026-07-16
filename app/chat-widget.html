@@ -252,6 +252,8 @@
 
         function addFiles(fileList) {
             const incoming = Array.from(fileList);
+            const addedFiles = []; // track only the files that actually made it in
+
             for (const file of incoming) {
                 if (selectedFiles.length >= MAX_FILES) {
                     console.warn(`Attachment limit reached (${MAX_FILES}).`);
@@ -262,9 +264,18 @@
                     continue;
                 }
                 selectedFiles.push(file);
+                addedFiles.push(file);
             }
             renderStrip();
             notifyChange();
+
+            // NEW: fire a dedicated "just selected" event (separate from remove/clear)
+            // so chat-main.js can auto-send without waiting for text input.
+            if (addedFiles.length > 0) {
+                document.dispatchEvent(
+                    new CustomEvent("attachments-added", { detail: { files: addedFiles } })
+                );
+            }
         }
 
         attachBtn.addEventListener("click", () => fileInput.click());
