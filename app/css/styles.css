@@ -30,6 +30,14 @@
     --shadow-md: 0 4px 16px rgba(91,75,196,.15);
 }
 
+
+.header, 
+.recipient-bar, 
+.compose-area {
+    flex-shrink: 0; /* Prevents these areas from compressing */
+}
+
+
 body {
     font-family: 'Sora', sans-serif;
     background: var(--bg);
@@ -81,6 +89,15 @@ body {
     display: flex;
     align-items: center;
     gap: 6px;
+}
+.chat-doc-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+.chat-doc-icon svg {
+    display: block;
 }
 
 .devtac-badge {
@@ -244,6 +261,7 @@ body {
     gap: 9px;
     background: var(--bg);
     scroll-behavior: smooth;
+    min-height: 0;
 }
 
 .messages-area::-webkit-scrollbar { width: 3px; }

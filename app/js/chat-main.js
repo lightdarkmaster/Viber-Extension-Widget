@@ -1743,9 +1743,6 @@ function sendMessage() {
         lookup_fields:         lookupFieldsStr,
         attachments:           []
     };
-
-    // ⚠️ remove the old duplicate `const files = window.DevtacAttachments...` line
-    // that used to appear here — it's declared above now.
     const filesToAttachToLog = [...files];
 
     const time = getNow();
