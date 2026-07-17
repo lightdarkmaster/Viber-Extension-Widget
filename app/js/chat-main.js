@@ -16,6 +16,11 @@ import {
 // ── Constants ─────────────────────────────────────────────────────────────────
 const MAX_CHARS = 1000;
 
+// File upload — UI-only for now (no send/store wiring yet)
+const MAX_FILES        = 100;
+const MAX_FILE_SIZE    = 200 * 1024 * 1024; // 200MB per file
+const ALLOWED_MIME_RE  = /.*/; // Allow any MIME type
+
 // ── Chat-widget state ─────────────────────────────────────────────────────────
 const chat = {
     module:           "",
@@ -35,6 +40,9 @@ const chat = {
     seenIds:          new Set(),
     ViberCredits:       null,
     noPhoneMode:      false,
+    attachments:      [], // [{ id, file, previewUrl, oversize, unsupported }]
+    attachmentCache: new Map() // newly added 7-14-26
+
 };
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
@@ -50,6 +58,11 @@ const $optsList   = $("#phoneOptionsList");
 const $tplPanel   = $("#tplPanel");
 const $tplList    = $("#tplList");
 const $tplTrigger = $("#tplTriggerBtn");
+const $attachBtn      = $("#attachBtn");
+const $fileInput      = $("#fileInput");
+const $attachPreview  = $("#attachmentPreview");
+const $attachList     = $("#attachmentList");
+const $attachClearAll = $("#attachClearAll");
 
 // ── Template panel ────────────────────────────────────────────────────────────
 $tplTrigger.on("click", (e) => {
@@ -153,6 +166,7 @@ function resolvePlaceholders(body) {
     });
 }
 
+// ── Template selection ────────────────────────────────────────────────────────
 function selectTemplate(t) {
     chat.selectedTpl = t;
     $msg.val(resolvePlaceholders(t.body || "")).prop("disabled", false);
@@ -201,11 +215,19 @@ function updateCharCount() {
         .addClass(len > MAX_CHARS ? "over" : len > 900 ? "warn" : "");
 }
 
+// function updateSendBtn() {
+//     const len       = ($msg.val() || "").trim().length;
+//     const over      = ($msg.val() || "").length > MAX_CHARS;
+//     const hasNumber = !!(chat.activePhone && chat.activePhone.resolvedNumber);
+//     $sendBtn.prop("disabled", !len || over || !chat.activePhone || !hasNumber);
+// }
+
 function updateSendBtn() {
     const len       = ($msg.val() || "").trim().length;
     const over      = ($msg.val() || "").length > MAX_CHARS;
     const hasNumber = !!(chat.activePhone && chat.activePhone.resolvedNumber);
-    $sendBtn.prop("disabled", !len || over || !chat.activePhone || !hasNumber);
+    const hasFiles  = !!(window.DevtacAttachments && window.DevtacAttachments.getFiles().length);
+    $sendBtn.prop("disabled", (!len && !hasFiles) || over || !chat.activePhone || !hasNumber);
 }
 
 // ── Phone picker ──────────────────────────────────────────────────────────────
@@ -313,9 +335,6 @@ function loadTemplates(module) {
             $tplList.html('<div class="tpl-empty">Error loading templates.</div>');
         });
 }
-
-// ── Phone field org variable map ──────────────────────────────────────────────
-// Imported from config.js — see MODULE_PHONE_VAR there.
 
 // ── Phone fields + resolve numbers ───────────────────────────────────────────
 function loadPhoneFieldsAndRecord(module, fields, record, savedPhoneField) {
@@ -442,36 +461,280 @@ function getNow() {
 
 let _bubbleId = 0;
 
-function buildBubbleHtml({ dir, text, time, statusClass, retryParams, logId }) {
-    const id       = "bubble-" + (++_bubbleId);
-    const initials = dir === "out" ? "ME" : ($("#recipientAvatar").text() || "??");
-    const showRetry  = !!(dir === "out" && retryParams);
-    const statusHtml = dir === "out" ? buildStatusHtml(statusClass || "sending", showRetry) : "";
+// Check for valid image extensions
+function isImageFile(filename) {
+    if (!filename) return false;
+    const ext = filename.split('.').pop().toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext);
+}
+
+// function buildBubbleHtml({ dir, text, time, statusClass, retryParams, logId, logRecord }) {
+
+//     const id       = "bubble-" + (++_bubbleId);
+//     const initials = dir === "out" ? "ME" : ($("#recipientAvatar").text() || "??");
+//     const showRetry  = !!(dir === "out" && retryParams);
+//     const statusHtml = dir === "out" ? buildStatusHtml(statusClass || "sending", showRetry) : "";
+
+//     const retryAttr = showRetry
+//         ? ` data-retry-params='${JSON.stringify(retryParams).replace(/'/g, "&#39;")}'`
+//         : "";
+//     const logAttr = (dir === "out" && logId)
+//         ? ` data-log-id="${logId}"`
+//         : "";
+
+//     // ── ATTACHMENT DISPLAY RENDERING ──
+//     let attachmentsHtml = "";
+//     if (logRecord) {
+//         // Adjust these keys to match your exact Custom Log Module field API names populated by Deluge/Catalyst
+//         const fileUrl  = logRecord.Attachment_URL || logRecord.File_URL || "";
+//         const fileName = logRecord.Attachment_Name || logRecord.File_Name || "Attachment";
+
+//         if (fileUrl) {
+//             if (isImageFile(fileName)) {
+//                 attachmentsHtml = `
+//                     <div class="chat-attachment-card image-preview">
+//                         <a href="${fileUrl}" target="_blank" title="View full image">
+//                             <img src="${fileUrl}" alt="${escapeHtml(fileName)}" class="chat-inline-img" />
+//                         </a>
+//                     </div>`;
+//             } else {
+//                 attachmentsHtml = `
+//                     <div class="chat-attachment-card doc-preview">
+//                         <a href="${fileUrl}" target="_blank" class="chat-doc-link">
+//                             <div class="chat-doc-icon">
+//                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+//                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+//                                 </svg>
+//                             </div>
+//                             <div class="chat-doc-meta">
+//                                 <span class="chat-doc-name" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</span>
+//                                 <span class="chat-doc-download-lbl">Click to View</span>
+//                             </div>
+//                         </a>
+//                     </div>`;
+//             }
+//         }
+//     }
+
+//     return `
+//         <div class="bubble-row ${dir}" id="${id}"${retryAttr}${logAttr}>
+//             <div class="bubble-avatar ${dir}">${initials}</div>
+//             <div class="bubble-wrap">
+//                 <div class="bubble-sender">${dir === "out" ? "You" : escapeHtml(chat.recordName)}</div>
+//                 <div class="bubble ${dir}">
+//                     ${text ? `<div class="bubble-text-content">${escapeHtml(text)}</div>` : ""}
+//                     ${attachmentsHtml}
+//                 </div>
+//                 <div class="bubble-meta">
+//                     <span class="bubble-time">${time}</span>
+//                     ${statusHtml}
+//                 </div>
+//             </div>
+//         </div>`;        
+// }
+
+// newly and revised added logic  7-14-26
+function buildAttachmentHtml(attachments = []) {
+    if (
+        !Array.isArray(attachments) ||
+        attachments.length === 0
+    ) {
+        return "";
+    }
+
+    return attachments.map((item) => {
+        const file =
+            item instanceof File
+                ? item
+                : item?.file || null;
+
+        const fileName =
+            file?.name ||
+            item?.filename ||
+            item?.fileName ||
+            "Attachment";
+
+        const fileType =
+            file?.type ||
+            item?.mime_type ||
+            item?.mimeType ||
+            "";
+
+        const previewUrl =
+            item?.previewUrl ||
+            item?.url ||
+            (
+                file instanceof File
+                    ? URL.createObjectURL(file)
+                    : ""
+            );
+
+        const isImage =
+            fileType.startsWith("image/") ||
+            isImageFile(fileName);
+
+        if (isImage && previewUrl) {
+            return `
+                <div class="chat-attachment-card image-preview">
+                    <a
+                        href="${previewUrl}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="View image"
+                    >
+                        <img
+                            src="${previewUrl}"
+                            alt="${escapeHtml(fileName)}"
+                            class="chat-inline-img"
+                        />
+                    </a>
+
+                    <div class="chat-attachment-name">
+                        ${escapeHtml(fileName)}
+                    </div>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="chat-attachment-card doc-preview">
+                ${
+                    previewUrl
+                        ? `
+                            <a
+                                href="${previewUrl}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="chat-doc-link"
+                                download="${escapeHtml(fileName)}"
+                            >
+                        `
+                        : `<div class="chat-doc-link">`
+                }
+
+                    <div class="chat-doc-icon">
+                        📎
+                    </div>
+
+                    <div class="chat-doc-meta">
+                        <span
+                            class="chat-doc-name"
+                            title="${escapeHtml(fileName)}"
+                        >
+                            ${escapeHtml(fileName)}
+                        </span>
+
+                        <span class="chat-doc-download-lbl">
+                            ${
+                                previewUrl
+                                    ? "Click to view"
+                                    : "Attachment unavailable"
+                            }
+                        </span>
+                    </div>
+
+                ${
+                    previewUrl
+                        ? "</a>"
+                        : "</div>"
+                }
+            </div>
+        `;
+    }).join("");
+}
+
+// revised bubblehtml 7-14-26
+function buildBubbleHtml({
+    dir,
+    text,
+    time,
+    statusClass,
+    retryParams,
+    logId,
+    logRecord,
+    attachments = []
+}) {
+    const id = "bubble-" + (++_bubbleId);
+    const initials =
+        dir === "out"
+            ? "ME"
+            : ($("#recipientAvatar").text() || "??");
+
+    const showRetry = !!(
+        dir === "out" &&
+        retryParams
+    );
+
+    const statusHtml =
+        dir === "out"
+            ? buildStatusHtml(
+                statusClass || "sending",
+                showRetry
+            )
+            : "";
 
     const retryAttr = showRetry
         ? ` data-retry-params='${JSON.stringify(retryParams).replace(/'/g, "&#39;")}'`
         : "";
-    const logAttr = (dir === "out" && logId)
-        ? ` data-log-id="${logId}"`
-        : "";
+
+    const logAttr =
+        dir === "out" && logId
+            ? ` data-log-id="${logId}"`
+            : "";
+
+    const attachmentsHtml =
+        buildAttachmentHtml(attachments);
 
     return `
-        <div class="bubble-row ${dir}" id="${id}"${retryAttr}${logAttr}>
-            <div class="bubble-avatar ${dir}">${initials}</div>
+        <div
+            class="bubble-row ${dir}"
+            id="${id}"
+            ${retryAttr}
+            ${logAttr}
+        >
+            <div class="bubble-avatar ${dir}">
+                ${initials}
+            </div>
+
             <div class="bubble-wrap">
-                <div class="bubble-sender">${dir === "out" ? "You" : escapeHtml(chat.recordName)}</div>
-                <div class="bubble ${dir}">${escapeHtml(text)}</div>
+                <div class="bubble-sender">
+                    ${
+                        dir === "out"
+                            ? "You"
+                            : escapeHtml(chat.recordName)
+                    }
+                </div>
+
+                <div class="bubble ${dir}">
+                    ${
+                        text
+                            ? `<div class="bubble-text-content">${escapeHtml(text)}</div>`
+                            : ""
+                    }
+
+                    ${
+                        attachmentsHtml
+                            ? `<div class="bubble-attachments">${attachmentsHtml}</div>`
+                            : ""
+                    }
+                </div>
+
                 <div class="bubble-meta">
-                    <span class="bubble-time">${time}</span>
+                    <span class="bubble-time">
+                        ${time}
+                    </span>
+
                     ${statusHtml}
                 </div>
             </div>
-        </div>`;
+        </div>
+    `;
 }
 
-function appendBubble({ dir, text, time, statusClass }) {
+// added attachments 7-14-26
+function appendBubble({ dir, text, time, statusClass, attachments = [] }) {
     $emptyState.hide();
-    const html = buildBubbleHtml({ dir, text, time, statusClass });
+    const html = buildBubbleHtml({ dir, text, time, statusClass, attachments });
     $area.append(html);
     $area[0].scrollTop = $area[0].scrollHeight;
     return $area.children(".bubble-row").last().attr("id");
@@ -520,8 +783,6 @@ function escapeHtml(str) {
 }
 
 // ── Phone normalisation ───────────────────────────────────────────────────────
-// Strips non-digits then removes leading country/trunk code so that
-// 09123456789, +639123456789, and 9123456789 all reduce to "9123456789".
 function normalizePhone(raw) {
     if (!raw) return "";
     let digits = String(raw).replace(/\D/g, "");
@@ -613,12 +874,8 @@ function renderHistoryHeader() {
 }
 
 // ── Load message history ──────────────────────────────────────────────────────
-// page 1  = fresh load / refresh  → fetch all, show newest slice, scroll to bottom
-// page 2+ = "load older"          → slice from allMessages, prepend
 function loadMessageHistory(module, recordId, page = 1) {
     const mod = (module || "").toLowerCase();
-
-    // RELATED_LISTS keys are PascalCase (Leads/Deals/Contacts); lower-case for lookup
     const relatedListMap = Object.fromEntries(
         Object.entries(RELATED_LISTS).map(([k, v]) => [k.toLowerCase(), v])
     );
@@ -634,23 +891,17 @@ function loadMessageHistory(module, recordId, page = 1) {
         chat.allMessages      = [];
         showHistoryLoading();
 
-        // Always call fetchLogsByPhone when there is an active phone field — even if
-        // resolvedNumber is empty — so the field-based query for no-number failed logs runs.
         const phoneSearchPromise = chat.activePhone
             ? fetchLogsByPhone(chat.activePhone.resolvedNumber).catch(() => [])
             : Promise.resolve([]);
 
         phoneSearchPromise
             .then((logs) => {
-                // Allow logs through if they have a phone number on either side,
-                // OR if they are a failed send tied to the active phone field
-                // (no-number failed sends stored via Selected_Phone_Field).
                 const activeField = chat.activePhone ? chat.activePhone.fieldApiName : null;
                 const filtered = logs.filter((log) => {
                     const hasRecipient = !!(log[LOG_FIELDS.RECIPIENT_NUMBER] || "").toString().trim();
                     const hasSender    = !!(log[LOG_FIELDS.SENDER_NUMBER]    || "").toString().trim();
                     if (hasRecipient || hasSender) return true;
-                    // No phone on either side — only show if tied to the active field
                     const logField = (log[LOG_FIELDS.SELECTED_PHONE_FIELD] || "").toString().trim();
                     return !!(activeField && logField && logField === activeField);
                 });
@@ -675,7 +926,6 @@ function loadMessageHistory(module, recordId, page = 1) {
     }
 }
 
-// Recursively fetches all Zoho related-list pages (200 per request).
 function fetchAllRelatedRecords(module, relatedList, accumulated, page) {
     return ZOHO.CRM.API.getRelatedRecords({
         Entity:      module,
@@ -692,12 +942,8 @@ function fetchAllRelatedRecords(module, relatedList, accumulated, page) {
     });
 }
 
-// Searches message logs by phone number in all common PH formats in parallel.
-// Also fetches no-number failed logs whose Selected_Phone_Field matches the active field,
-// so that failed sends on empty phone fields appear in the correct field's history.
 function fetchLogsByPhone(rawNumber) {
     const activeFieldApiName = chat.activePhone ? chat.activePhone.fieldApiName : null;
-
     const phoneQueries = [];
 
     if (rawNumber) {
@@ -749,12 +995,7 @@ function fetchLogsByPhone(rawNumber) {
     });
 }
 
-// Reconstructs the minimum params needed to retry a historically-loaded failed message.
-// template_id and lookup_fields are intentionally omitted — the resolved message content
-// stored on the log is used as free-text, which produces the same result for the recipient.
 function buildRetryParams(log) {
-    // Prefer the field stored on the log itself (Selected_Phone_Field) so that a
-    // no-phone failed log retried from history targets the correct field.
     const logField      = (log[LOG_FIELDS.SELECTED_PHONE_FIELD] || "").toString().trim();
     const fieldApiName  = logField || (chat.activePhone ? chat.activePhone.fieldApiName : "");
     const fieldLabel    = chat.activePhone && chat.activePhone.fieldApiName === fieldApiName
@@ -775,51 +1016,514 @@ function buildRetryParams(log) {
     };
 }
 
-function renderPage(page) {
-    const batchSize  = chat.historyBatchSize;
-    const all        = chat.allMessages;
-    const total      = all.length;
-    const totalPages = Math.ceil(total / batchSize);
-    const sliceEnd   = total - (page - 1) * batchSize;
-    const sliceStart = Math.max(0, sliceEnd - batchSize);
-    const slice      = all.slice(sliceStart, sliceEnd);
+// newly added 7-14-26
+function fetchLogAttachments(logId) {
+    if (!logId) {
+        console.warn(
+            "[DevtacMessaging] Cannot fetch attachments: log ID is empty."
+        );
 
-    if (!chat.noPhoneMode) $emptyState.hide();
-
-    const batchHtml = slice.map((log) => {
-        chat.seenIds.add(log.id);
-        console.log("[DevtacMessaging] renderPage log:", log.id, log);
-        const dir         = (log[LOG_FIELDS.DIRECTION] || "").toLowerCase() === "inbound" ? "in" : "out";
-        const status      = (log[LOG_FIELDS.STATUS]    || "").toLowerCase() === "failed"  ? "failed" : "sent";
-        const ts          = log.Created_Time || log[LOG_FIELDS.MESSAGE_TIMESTAMP];
-        const time        = ts
-            ? new Date(ts).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })
-            : "—";
-        const recipientNum = (log[LOG_FIELDS.RECIPIENT_NUMBER] || "").toString().trim();
-        const retryParams  = (dir === "out" && status === "failed") ? buildRetryParams(log) : null;
-        return buildBubbleHtml({ dir, text: log[LOG_FIELDS.MESSAGE_CONTENT] || "", time, statusClass: dir === "out" ? status : null, retryParams, logId: log.id });
-    }).join("");
-
-    chat.historyPage      = page;
-    chat.historyExhausted = page >= totalPages;
-
-    if (page === 1) {
-        $area.append(batchHtml);
-        renderHistoryHeader();
-        setTimeout(() => {
-            $area[0].scrollTop = $area[0].scrollHeight;
-        }, 100);
-    } else {
-        const prevScrollTop    = $area[0].scrollTop;
-        const prevScrollHeight = $area[0].scrollHeight;
-        $historyHeader.after(batchHtml);
-        renderHistoryHeader();
-        setTimeout(() => {
-            const addedHeight = $area[0].scrollHeight - prevScrollHeight;
-            $area[0].scrollTop = prevScrollTop + addedHeight;
-        }, 100);
+        return Promise.resolve([]);
     }
+
+    console.log(
+        "[DevtacMessaging] Fetching attachments for log:",
+        logId
+    );
+
+    return ZOHO.CRM.API.getRelatedRecords({
+        Entity: ENTITY.LOGS,
+        RecordID: logId,
+        RelatedList: "Attachments",
+        page: 1,
+        per_page: 100
+    })
+    .then((response) => {
+        console.log(
+            "[DevtacMessaging] Raw attachment response:",
+            logId,
+            response
+        );
+
+        const records =
+            response?.data ||
+            response?.attachments ||
+            [];
+
+        console.log(
+            "[DevtacMessaging] Attachment records found:",
+            records.length,
+            records
+        );
+
+        const attachments = records.map((attachment) => {
+            // DEBUG: log the raw record shape so we can confirm the real
+            // file-id field name. Safe to remove once confirmed.
+            console.log(
+                "[DevtacMessaging] Raw attachment record:",
+                JSON.stringify(attachment, null, 2)
+            );
+
+            // The Attachments related-list record's `id` is the ATTACHMENT
+            // RECORD id, not the internal file id that getFile() needs.
+            // $file_id (when present) is the correct one to use — check it
+            // FIRST. Fall back through other known variants, and only use
+            // `id` as a last resort since it's almost always present but
+            // frequently the WRONG value for getFile().
+            const attachmentId =
+                attachment.$file_id ||
+                attachment.File_Id ||
+                attachment.file_id ||
+                attachment.attachment_id ||
+                attachment.id ||
+                "";
+
+            const fileName =
+                attachment.File_Name ||
+                attachment.file_name ||
+                attachment.Name ||
+                attachment.name ||
+                "Attachment";
+
+            const fileType =
+                attachment.$file_type ||
+                attachment.File_Type ||
+                attachment.file_type ||
+                "";
+
+            return {
+                id: attachmentId,
+                recordId: attachment.id || "", // keep the record id around too, for debugging
+                filename: fileName,
+                mime_type: fileType,
+                logId,
+                storedInCRM: true
+            };
+        });
+
+        console.log(
+            "[DevtacMessaging] Normalized attachments:",
+            attachments
+        );
+
+        return attachments;
+    })
+    .catch((error) => {
+        console.error(
+            "[DevtacMessaging] Failed to fetch CRM attachments.",
+            {
+                module: ENTITY.LOGS,
+                logId,
+                relatedList: "Attachments",
+                error
+            }
+        );
+
+        return [];
+    });
 }
+
+// newly added 7-14-26
+function getMimeTypeFromFilename(filename = "") {
+    const extension =
+        filename.split(".").pop().toLowerCase();
+
+    const mimeTypes = {
+        jpg:  "image/jpeg",
+        jpeg: "image/jpeg",
+        png:  "image/png",
+        gif:  "image/gif",
+        webp: "image/webp",
+        bmp:  "image/bmp",
+        svg:  "image/svg+xml",
+        pdf:  "application/pdf",
+        doc:  "application/msword",
+        docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        xls:  "application/vnd.ms-excel",
+        xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    };
+
+    return mimeTypes[extension] ||
+        "application/octet-stream";
+}
+
+function binaryStringToBlob(
+    binaryString,
+    mimeType = "application/octet-stream"
+) {
+    /*
+     * The SDK may return either a binary string or Base64.
+     * First try Base64 decoding.
+     */
+    let binary = binaryString;
+
+    try {
+        const cleaned = binaryString.includes(",")
+            ? binaryString.substring(
+                binaryString.indexOf(",") + 1
+            )
+            : binaryString;
+
+        binary = atob(cleaned);
+    }
+    catch (error) {
+        // Keep the original value if it is already a binary string.
+        binary = binaryString;
+    }
+
+    const bytes =
+        new Uint8Array(binary.length);
+
+    for (let index = 0; index < binary.length; index++) {
+        bytes[index] =
+            binary.charCodeAt(index) & 0xff;
+    }
+
+    return new Blob(
+        [bytes],
+        {
+            type: mimeType
+        }
+    );
+}
+
+// newly added 7-14-26
+function downloadStoredAttachment(attachment) {
+    if (!attachment || !attachment.id) {
+        console.warn(
+            "[DevtacMessaging] Missing attachment ID:",
+            attachment
+        );
+
+        return Promise.resolve(attachment);
+    }
+
+    if (attachment.previewUrl) {
+        return Promise.resolve(attachment);
+    }
+
+    console.log(
+        "[DevtacMessaging] Getting stored attachment:",
+        attachment
+    );
+
+    return ZOHO.CRM.API.getFile({
+        id: attachment.id
+    })
+    .then((response) => {
+        console.log(
+            "[DevtacMessaging] getFile response:",
+            response
+        );
+
+        let fileContent = response;
+
+        if (response?.data !== undefined) {
+            fileContent = response.data;
+        }
+
+        if (response?.content !== undefined) {
+            fileContent = response.content;
+        }
+
+        let blob = null;
+
+        if (fileContent instanceof Blob) {
+            blob = fileContent;
+        }
+        else if (fileContent instanceof ArrayBuffer) {
+            blob = new Blob(
+                [fileContent],
+                {
+                    type:
+                        attachment.mime_type ||
+                        getMimeTypeFromFilename(
+                            attachment.filename
+                        )
+                }
+            );
+        }
+        else if (ArrayBuffer.isView(fileContent)) {
+            blob = new Blob(
+                [fileContent.buffer],
+                {
+                    type:
+                        attachment.mime_type ||
+                        getMimeTypeFromFilename(
+                            attachment.filename
+                        )
+                }
+            );
+        }
+        else if (
+            typeof fileContent === "string" &&
+            fileContent.length > 0
+        ) {
+            blob = binaryStringToBlob(
+                fileContent,
+                attachment.mime_type ||
+                getMimeTypeFromFilename(
+                    attachment.filename
+                )
+            );
+        }
+
+        // If we got a Blob back but it's empty and/or XML, that's Zoho's
+        // generic error-response shape (bad/invalid id, no permission,
+        // file not found, etc). Try to read its text so the real error
+        // message from Zoho surfaces in the console instead of a generic
+        // failure.
+        if (blob && (blob.size === 0 || (blob.type || "").includes("xml"))) {
+            return blob.text().then((text) => {
+                throw new Error(
+                    "getFile returned an error response instead of file content: " +
+                    (text && text.trim().length ? text : "(empty body, size 0)")
+                );
+            }).catch((readErr) => {
+                // blob.text() itself failed, or we threw above — normalize
+                // into a single rejection either way.
+                if (readErr instanceof Error && readErr.message.startsWith("getFile returned an error response")) {
+                    throw readErr;
+                }
+                throw new Error(
+                    "getFile did not return usable file content, and its error body could not be read."
+                );
+            });
+        }
+
+        if (!blob) {
+            throw new Error(
+                "getFile did not return usable file content."
+            );
+        }
+
+        attachment.previewUrl =
+            URL.createObjectURL(blob);
+
+        attachment.blob = blob;
+
+        if (!attachment.mime_type) {
+            attachment.mime_type = blob.type;
+        }
+
+        return attachment;
+    })
+    .catch((error) => {
+        console.error(
+            "[DevtacMessaging] Failed to retrieve stored attachment:",
+            attachment,
+            error
+        );
+
+        return attachment;
+    });
+}
+
+
+// revised renderPage 7-14-26
+function renderPage(page) {
+    const batchSize = chat.historyBatchSize;
+    const all = chat.allMessages;
+    const total = all.length;
+    const totalPages = Math.ceil(total / batchSize);
+
+    const sliceEnd =
+        total - (page - 1) * batchSize;
+
+    const sliceStart =
+        Math.max(0, sliceEnd - batchSize);
+
+    const slice =
+        all.slice(sliceStart, sliceEnd);
+
+    if (!chat.noPhoneMode) {
+        $emptyState.hide();
+    }
+
+    const bubblePromises = slice.map((log) => {
+        chat.seenIds.add(log.id);
+
+        const dir =
+            (log[LOG_FIELDS.DIRECTION] || "")
+                .toLowerCase() === "inbound"
+                ? "in"
+                : "out";
+
+        const status =
+            (log[LOG_FIELDS.STATUS] || "")
+                .toLowerCase() === "failed"
+                ? "failed"
+                : "sent";
+
+        const ts =
+            log.Created_Time ||
+            log[LOG_FIELDS.MESSAGE_TIMESTAMP];
+
+        const time = ts
+            ? new Date(ts).toLocaleTimeString(
+                "en-PH",
+                {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: true
+                }
+            )
+            : "—";
+
+        const retryParams =
+            dir === "out" &&
+            status === "failed"
+                ? buildRetryParams(log)
+                : null;
+
+        return fetchLogAttachments(log.id)
+            .then((attachments) => {
+                return Promise.all(
+                    attachments.map(
+                        downloadStoredAttachment
+                    )
+                );
+            })
+            .then((downloadedAttachments) => {
+                return buildBubbleHtml({
+                    dir,
+                    text:
+                        log[
+                            LOG_FIELDS.MESSAGE_CONTENT
+                        ] || "",
+                    time,
+                    statusClass:
+                        dir === "out"
+                            ? status
+                            : null,
+                    retryParams,
+                    logId: log.id,
+                    logRecord: log,
+                    attachments:
+                        downloadedAttachments.filter(Boolean)
+                });
+            })
+            .catch((error) => {
+                console.error(
+                    "[DevtacMessaging] Failed to load log attachments:",
+                    log.id,
+                    error
+                );
+
+                return buildBubbleHtml({
+                    dir,
+                    text:
+                        log[
+                            LOG_FIELDS.MESSAGE_CONTENT
+                        ] || "",
+                    time,
+                    statusClass:
+                        dir === "out"
+                            ? status
+                            : null,
+                    retryParams,
+                    logId: log.id,
+                    logRecord: log,
+                    attachments: []
+                });
+            });
+    });
+
+    Promise.all(bubblePromises)
+        .then((bubbleHtmlList) => {
+            const batchHtml =
+                bubbleHtmlList.join("");
+
+            chat.historyPage = page;
+            chat.historyExhausted =
+                page >= totalPages;
+
+            if (page === 1) {
+                $area.append(batchHtml);
+
+                renderHistoryHeader();
+
+                setTimeout(() => {
+                    $area[0].scrollTop =
+                        $area[0].scrollHeight;
+                }, 100);
+            } else {
+                const previousScrollTop =
+                    $area[0].scrollTop;
+
+                const previousScrollHeight =
+                    $area[0].scrollHeight;
+
+                $historyHeader.after(batchHtml);
+
+                renderHistoryHeader();
+
+                setTimeout(() => {
+                    const addedHeight =
+                        $area[0].scrollHeight -
+                        previousScrollHeight;
+
+                    $area[0].scrollTop =
+                        previousScrollTop +
+                        addedHeight;
+                }, 100);
+            }
+        })
+        .catch((error) => {
+            console.error(
+                "[DevtacMessaging] Could not render message history:",
+                error
+            );
+
+            renderHistoryHeader();
+        });
+}
+
+// function renderPage(page) {
+//     const batchSize  = chat.historyBatchSize;
+//     const all        = chat.allMessages;
+//     const total      = all.length;
+//     const totalPages = Math.ceil(total / batchSize);
+//     const sliceEnd   = total - (page - 1) * batchSize;
+//     const sliceStart = Math.max(0, sliceEnd - batchSize);
+//     const slice      = all.slice(sliceStart, sliceEnd);
+
+//     if (!chat.noPhoneMode) $emptyState.hide();
+
+//     const batchHtml = slice.map((log) => {
+//         chat.seenIds.add(log.id);
+//         const dir         = (log[LOG_FIELDS.DIRECTION] || "").toLowerCase() === "inbound" ? "in" : "out";
+//         const status      = (log[LOG_FIELDS.STATUS]    || "").toLowerCase() === "failed"  ? "failed" : "sent";
+//         const ts          = log.Created_Time || log[LOG_FIELDS.MESSAGE_TIMESTAMP];
+//         const time        = ts
+//             ? new Date(ts).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })
+//             : "—";
+//         const retryParams  = (dir === "out" && status === "failed") ? buildRetryParams(log) : null;
+
+//         // Pass the full log record object down here
+//         return buildBubbleHtml({ dir, text: log[LOG_FIELDS.MESSAGE_CONTENT] || "", time, statusClass: dir === "out" ? status : null, retryParams, logId: log.id, logRecord: log });
+//     }).join("");
+
+//     chat.historyPage      = page;
+//     chat.historyExhausted = page >= totalPages;
+
+//     if (page === 1) {
+//         $area.append(batchHtml);
+//         renderHistoryHeader();
+//         setTimeout(() => {
+//             $area[0].scrollTop = $area[0].scrollHeight;
+//         }, 100);
+//     } else {
+//         const prevScrollTop    = $area[0].scrollTop;
+//         const prevScrollHeight = $area[0].scrollHeight;
+//         $historyHeader.after(batchHtml);
+//         renderHistoryHeader();
+//         setTimeout(() => {
+//             const addedHeight = $area[0].scrollHeight - prevScrollHeight;
+//             $area[0].scrollTop = prevScrollTop + addedHeight;
+//         }, 100);
+//     }
+// }
 
 function buildRelatedField(module, recordId) {
     const mod = (module || "").toLowerCase();
@@ -828,12 +1532,198 @@ function buildRelatedField(module, recordId) {
     return {};
 }
 
-// ── Send ──────────────────────────────────────────────────────────────────────
-function sendMessage() {
-    const text = ($msg.val() || "").trim();
-    if (!text || !chat.activePhone) return;
+// Helper to convert file to Base64 (stripping raw prefix)
+function fileToBase64(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const base64Str = reader.result;
+            const commaIdx = base64Str.indexOf(",");
+            const content = commaIdx !== -1 ? base64Str.substring(commaIdx + 1) : base64Str;
+            resolve({
+                filename: file.name,
+                mime_type: file.type || "application/octet-stream",
+                content: content
+            });
+        };
+        reader.onerror = () => {
+            resolve({
+                filename: file.name,
+                mime_type: file.type || "application/octet-stream",
+                content: ""
+            });
+        };
+    });
+}
 
-    const tplId          = chat.selectedTpl ? chat.selectedTpl.id : null;
+// Newly Added 7-13-26
+function attachFilesToLogRecord(logId, files = []) {
+    if (!logId || !files || !files.length) {
+        return Promise.resolve([]);
+    }
+
+    const validFiles = files.filter(file => file instanceof File);
+
+    if (!validFiles.length) {
+        return Promise.resolve([]);
+    }
+
+    console.log("[DevtacMessaging] Attaching files to log record:", {
+        logId,
+        count: validFiles.length,
+        files: validFiles.map(file => file.name)
+    });
+
+    return Promise.allSettled(
+        validFiles.map((file) => {
+            return ZOHO.CRM.API.attachFile({
+                Entity: ENTITY.LOGS, // should point to your Viber_Messages module in config.js
+                RecordID: logId,
+                File: {
+                    Name: file.name,
+                    Content: file
+                }
+            });
+        })
+    );
+}
+
+// ── Send ──────────────────────────────────────────────────────────────────────
+// function sendMessage() {
+//     const text = ($msg.val() || "").trim();
+//     if (!text || !chat.activePhone) return;
+
+//     const tplId          = chat.selectedTpl ? chat.selectedTpl.id : null;
+//     const lookupFieldsStr = (state.lookupFields || [])
+//         .map(f => f.fieldApiName + "|" + f.relatedModule)
+//         .join(",");
+
+//     const params = {
+//         record_id:             chat.recordId,
+//         template_id:           tplId || "",
+//         message:               text,
+//         channel:               CONFIG.CHANNEL,
+//         selected_module:       chat.module,
+//         selected_module_label: chat.module,
+//         phone_source:          chat.activePhone.source,
+//         selected_field:        chat.activePhone.fieldApiName,
+//         selected_field_label:  chat.activePhone.label,
+//         lookup_field:          chat.activePhone.lookupField  || "",
+//         lookup_field_label:    chat.activePhone.lookupLabel  || "",
+//         lookup_fields:         lookupFieldsStr,
+//         attachments:           [] // populated below if files exist
+//     };
+
+//     const files = window.DevtacAttachments ? window.DevtacAttachments.getFiles() : [];
+
+//     const time     = getNow();
+//     const bubbleId = appendBubble({ dir: "out", text, time, statusClass: "sending", retryParams: params });
+
+//     $sendBtn.prop("disabled", true);
+//     $msg.val("");
+//     clearTemplate();
+//     updateCharCount();
+
+//     // Read files as Base64 and include in payload before triggering executeSend
+//     if (files.length > 0) {
+//         const promises = files.map(fileToBase64);
+//         Promise.all(promises).then((attachments) => {
+//             params.attachments = attachments;
+//             if (window.DevtacAttachments) {
+//                 window.DevtacAttachments.clear(); // Clear upload strip on successful read
+//             }
+//             executeSend({ params, bubbleId });
+//         });
+//     } else {
+//         executeSend({ params, bubbleId });
+//     }
+// }
+
+// Newly Added 7-13-26  old code
+// function sendMessage() {
+//     const text = ($msg.val() || "").trim();
+//     if (!text || !chat.activePhone) return;
+
+//     const tplId = chat.selectedTpl ? chat.selectedTpl.id : null;
+//     const lookupFieldsStr = (state.lookupFields || [])
+//         .map(f => f.fieldApiName + "|" + f.relatedModule)
+//         .join(",");
+
+//     const params = {
+//         record_id:             chat.recordId,
+//         template_id:           tplId || "",
+//         message:               text,
+//         channel:               CONFIG.CHANNEL,
+//         selected_module:       chat.module,
+//         selected_module_label: chat.module,
+//         phone_source:          chat.activePhone.source,
+//         selected_field:        chat.activePhone.fieldApiName,
+//         selected_field_label:  chat.activePhone.label,
+//         lookup_field:          chat.activePhone.lookupField  || "",
+//         lookup_field_label:    chat.activePhone.lookupLabel  || "",
+//         lookup_fields:         lookupFieldsStr,
+//         attachments:           [] // populated below if files exist
+//     };
+
+//     const files = window.DevtacAttachments ? window.DevtacAttachments.getFiles() : [];
+//     console.log(files);
+//     // Keep the original File objects for CRM attachFile after log_id is returned
+//     const filesToAttachToLog = [...files];
+
+//     const time = getNow();
+//     // newly added attachments 7-14-26
+//     const bubbleId = appendBubble({
+//         dir: "out",
+//         text,
+//         time,
+//         statusClass: "sending",
+//         retryParams: params,
+//         attachments: filesToAttachToLog
+//     });
+
+//     $sendBtn.prop("disabled", true);
+//     $msg.val("");
+//     clearTemplate();
+//     updateCharCount();
+
+//     // Read files as Base64 and include them in the payload before sending
+//     if (files.length > 0) {
+//         const promises = files.map(fileToBase64);
+
+//         Promise.all(promises).then((attachments) => {
+//             params.attachments = attachments;
+
+//             if (window.DevtacAttachments) {
+//                 window.DevtacAttachments.clear();
+//             }
+
+//             executeSend({
+//                 params,
+//                 bubbleId,
+//                 attachedFiles: filesToAttachToLog
+//             });
+//         });
+//     } else {
+//         executeSend({
+//             params,
+//             bubbleId,
+//             attachedFiles: filesToAttachToLog
+//         });
+//     }
+// }
+
+
+//New Added by Chan
+
+function sendMessage() {
+    const text  = ($msg.val() || "").trim();
+    const files = window.DevtacAttachments ? window.DevtacAttachments.getFiles() : [];
+
+    // now requires text OR files, not just text
+    if ((!text && !files.length) || !chat.activePhone || !chat.activePhone.resolvedNumber) return;
+
+    const tplId = chat.selectedTpl ? chat.selectedTpl.id : null;
     const lookupFieldsStr = (state.lookupFields || [])
         .map(f => f.fieldApiName + "|" + f.relatedModule)
         .join(",");
@@ -851,20 +1741,81 @@ function sendMessage() {
         lookup_field:          chat.activePhone.lookupField  || "",
         lookup_field_label:    chat.activePhone.lookupLabel  || "",
         lookup_fields:         lookupFieldsStr,
+        attachments:           []
     };
+    const filesToAttachToLog = [...files];
 
-    const time     = getNow();
-    const bubbleId = appendBubble({ dir: "out", text, time, statusClass: "sending", retryParams: params });
+    const time = getNow();
+    const bubbleId = appendBubble({
+        dir: "out",
+        text,
+        time,
+        statusClass: "sending",
+        retryParams: params,
+        attachments: filesToAttachToLog
+    });
 
     $sendBtn.prop("disabled", true);
     $msg.val("");
     clearTemplate();
     updateCharCount();
 
-    executeSend({ params, bubbleId });
+    if (files.length > 0) {
+        Promise.all(files.map(fileToBase64)).then((attachments) => {
+            params.attachments = attachments;
+            if (window.DevtacAttachments) window.DevtacAttachments.clear();
+            executeSend({ params, bubbleId, attachedFiles: filesToAttachToLog });
+        });
+    } else {
+        executeSend({ params, bubbleId, attachedFiles: filesToAttachToLog });
+    }
 }
 
-function executeSend({ params, bubbleId, existingLogId }) {
+
+// function executeSend({ params, bubbleId, existingLogId }) {
+//     const body = existingLogId
+//         ? { ...params, existing_log_id: existingLogId }
+//         : { ...params };
+
+//     ZOHO.CRM.HTTP.post({
+//         url:     SEND_API_URL(chat.zapiKey),
+//         headers: { "Content-Type": "application/json" },
+//         body,
+//     })
+//         .then((res) => {
+//             const data      = typeof res === "string" ? JSON.parse(res) : (res?.data ? (typeof res.data === "string" ? JSON.parse(res.data) : res.data) : res);
+//             const rawResult = data?.details?.output;
+//             const result    = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
+//             const success   = result?.success === true || result?.success === "true";
+
+//             const logId = result?.log_id || null;
+//             if (logId) chat.seenIds.add(logId);
+
+//             if (result?.new_balance !== undefined && result?.new_balance !== null) {
+//                 chat.ViberCredits = result.new_balance;
+//                 renderViberCredits();
+//             }
+
+//             // Store retry params on bubble only while it's failed so retry works
+//             const $bubble = $("#" + bubbleId);
+//             if (!success && params) {
+//                 $bubble.attr("data-retry-params", JSON.stringify(params));
+//             } else {
+//                 $bubble.removeAttr("data-retry-params");
+//             }
+
+//             updateBubbleStatus(bubbleId, success ? "sent" : "failed", logId);
+//         })
+//         .catch(() => {
+//             const $bubble = $("#" + bubbleId);
+//             if (params) $bubble.attr("data-retry-params", JSON.stringify(params));
+//             updateBubbleStatus(bubbleId, "failed");
+//         })
+//         .finally(() => updateSendBtn());
+// }
+
+// Newly Added 7-13-26
+function executeSend({ params, bubbleId, existingLogId, attachedFiles = [] }) {
     const body = existingLogId
         ? { ...params, existing_log_id: existingLogId }
         : { ...params };
@@ -874,33 +1825,161 @@ function executeSend({ params, bubbleId, existingLogId }) {
         headers: { "Content-Type": "application/json" },
         body,
     })
-        .then((res) => {
-            const data      = typeof res === "string" ? JSON.parse(res) : (res?.data ? (typeof res.data === "string" ? JSON.parse(res.data) : res.data) : res);
-            const rawResult = data?.details?.output;
-            const result    = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
-            const success   = result?.success === true || result?.success === "true";
+    // Newly Added 7-14-26
+    .then((res) => {
+    const data = typeof res === "string"
+        ? JSON.parse(res)
+        : (
+            res?.data
+                ? (
+                    typeof res.data === "string"
+                        ? JSON.parse(res.data)
+                        : res.data
+                )
+                : res
+        );
 
-            const logId = result?.log_id || null;
-            if (logId) chat.seenIds.add(logId);
+    const rawResult = data?.details?.output;
 
-            if (result?.new_balance !== undefined && result?.new_balance !== null) {
-                chat.ViberCredits = result.new_balance;
-                renderViberCredits();
-            }
+    const result = typeof rawResult === "string"
+        ? JSON.parse(rawResult)
+        : rawResult;
 
-            // Store retry params on bubble only while it's failed so retry works
+    const success =
+        result?.success === true ||
+        result?.success === "true";
+
+    const CRMLogsCreated =
+        result?.CRMLogsCreated === true ||
+        result?.CRMLogsCreated === "true";
+
+    const logId = result?.log_id || null;
+
+    if (logId) {
+        chat.seenIds.add(logId);
+    }
+
+    if (
+        result?.new_balance !== undefined &&
+        result?.new_balance !== null
+    ) {
+        chat.ViberCredits = result.new_balance;
+        renderViberCredits();
+    }
+
+    const $bubble = $("#" + bubbleId);
+
+    if (!success && params) {
+        $bubble.attr(
+            "data-retry-params",
+            JSON.stringify(params)
+        );
+    } else {
+        $bubble.removeAttr("data-retry-params");
+    }
+
+    if (
+        success &&
+        CRMLogsCreated &&
+        logId &&
+        attachedFiles &&
+        attachedFiles.length > 0
+    ) {
+        return attachFilesToLogRecord(logId, attachedFiles)
+            .then((attachResults) => {
+                console.log(
+                    "[DevtacMessaging] Attach file results:",
+                    attachResults
+                );
+
+                updateBubbleStatus(
+                    bubbleId,
+                    "sent",
+                    logId
+                );
+            })
+            .catch((uploadError) => {
+                console.error(
+                    "[DevtacMessaging] Message sent, but file upload to log failed:",
+                    uploadError
+                );
+
+                updateBubbleStatus(
+                    bubbleId,
+                    "sent",
+                    logId
+                );
+            });
+    }
+
+    updateBubbleStatus(
+        bubbleId,
+        success ? "sent" : "failed",
+        logId
+    );
+})
+        // .then((res) => {
+        //     const data = typeof res === "string"
+        //         ? JSON.parse(res)
+        //         : (
+        //             res?.data
+        //                 ? (typeof res.data === "string" ? JSON.parse(res.data) : res.data)
+        //                 : res
+        //         );
+
+        //     const rawResult = data?.details?.output;
+        //     const result = typeof rawResult === "string"
+        //         ? JSON.parse(rawResult)
+        //         : rawResult;
+
+        //     const success = result?.success === true || result?.success === "true";
+
+        //     const logId = result?.log_id || null;
+
+        //     if (logId) {
+        //         chat.seenIds.add(logId);
+        //     }
+
+        //     if (result?.new_balance !== undefined && result?.new_balance !== null) {
+        //         chat.ViberCredits = result.new_balance;
+        //         renderViberCredits();
+        //     }
+
+        //     const $bubble = $("#" + bubbleId);
+
+        //     // Store retry params only if sending failed
+        //     if (!success && params) {
+        //         $bubble.attr("data-retry-params", JSON.stringify(params));
+        //     } else {
+        //         $bubble.removeAttr("data-retry-params");
+        //     }
+
+        //     // If message was sent and log record was created, attach uploaded files to the log record
+        //     if (success && logId && attachedFiles && attachedFiles.length > 0) {
+        //         return attachFilesToLogRecord(logId, attachedFiles)
+        //             .then((attachResults) => {
+        //                 console.log("[DevtacMessaging] Attach file results:", attachResults);
+        //                 updateBubbleStatus(bubbleId, "sent", logId);
+        //             })
+        //             .catch((uploadError) => {
+        //                 console.error("[DevtacMessaging] Message sent, but file upload to log failed:", uploadError);
+
+        //                 // Message was still sent, so mark bubble as sent even if CRM file attachment failed
+        //                 updateBubbleStatus(bubbleId, "sent", logId);
+        //             });
+        //     }
+
+        //     updateBubbleStatus(bubbleId, success ? "sent" : "failed", logId);
+        // })
+        .catch((err) => {
+            console.error("[DevtacMessaging] Send failed:", err);
+
             const $bubble = $("#" + bubbleId);
-            if (!success && params) {
+
+            if (params) {
                 $bubble.attr("data-retry-params", JSON.stringify(params));
-            } else {
-                $bubble.removeAttr("data-retry-params");
             }
 
-            updateBubbleStatus(bubbleId, success ? "sent" : "failed", logId);
-        })
-        .catch(() => {
-            const $bubble = $("#" + bubbleId);
-            if (params) $bubble.attr("data-retry-params", JSON.stringify(params));
             updateBubbleStatus(bubbleId, "failed");
         })
         .finally(() => updateSendBtn());
@@ -931,6 +2010,20 @@ $area.on("click", ".retry-btn", function () {
 });
 
 $sendBtn.on("click", sendMessage);
+
+document.addEventListener("attachments-changed", (e) => {
+    updateSendBtn();
+
+    const { files, added } = e.detail || {};
+    if (!added || !files || !files.length) return;
+
+    if (!chat.activePhone || !chat.activePhone.resolvedNumber) {
+        console.warn("[DevtacMessaging] Cannot auto-send attachment: no active phone number.");
+        return;
+    }
+
+    sendMessage();
+});
 
 // ── Refresh ───────────────────────────────────────────────────────────────────
 $("#refreshBtn").on("click", () => {
@@ -1033,10 +2126,10 @@ function pollNewMessages() {
                 const time         = ts
                     ? new Date(ts).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })
                     : "—";
-                const recipientNum = (log[LOG_FIELDS.RECIPIENT_NUMBER] || "").toString().trim();
-                // Build retryParams for all failed outbound logs
                 const retryParams  = (dir === "out" && status === "failed") ? buildRetryParams(log) : null;
-                $area.append(buildBubbleHtml({ dir, text: log[LOG_FIELDS.MESSAGE_CONTENT] || "", time, statusClass: dir === "out" ? status : null, retryParams, logId: log.id }));
+
+                // Pass the full log record object down here
+                $area.append(buildBubbleHtml({ dir, text: log[LOG_FIELDS.MESSAGE_CONTENT] || "", time, statusClass: dir === "out" ? status : null, retryParams, logId: log.id, logRecord: log }));
             });
 
             if (isAtBottom) $area[0].scrollTop = $area[0].scrollHeight;

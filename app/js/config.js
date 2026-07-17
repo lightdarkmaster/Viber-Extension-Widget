@@ -16,7 +16,7 @@ export const CONFIG = {
     // ── Identity ───────────────────────────────────────────────────────────────
     // The Zoho Sigma extension namespace. Change this when duplicating for
     // another channel.
-    NAMESPACE: "devtacVibermessaging",
+    NAMESPACE: "devtacvibermessaging",
 
     // The messaging channel. Used as a display label and as the "channel"
     // parameter sent to the backend send function.

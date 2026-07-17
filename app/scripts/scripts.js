@@ -42,19 +42,11 @@ const CONFIG = {
     /* Character limit warning threshold (% of max) */
     CHAR_WARN_PCT: 0.85,
 
-    /* Max file upload size in bytes (10 MB) */
-    MAX_FILE_BYTES: 10 * 1024 * 1024,
+    /* Max file upload size in bytes (200 MB) */
+    MAX_FILE_BYTES: 200 * 1024 * 1024,
 
-    /* Allowed MIME types for attachments */
-    ALLOWED_TYPES: [
-        'image/jpeg','image/png','image/gif','image/webp',
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'text/plain','application/zip'
-    ]
+    /* Allowed MIME types for attachments (empty allows all types) */
+    ALLOWED_TYPES: []
 };
 
 /* ════════════════════════════════════════════════════════════
@@ -1068,11 +1060,13 @@ const UI = {
 
         files.forEach(file => {
             if (file.size > CONFIG.MAX_FILE_BYTES) {
-                UI.toast(`${file.name} exceeds 10 MB limit.`, 'warning');
+                const limitMB = CONFIG.MAX_FILE_BYTES / (1024 * 1024);
+                UI.toast(`${file.name} exceeds ${limitMB} MB limit.`, 'warning');
                 rejected++;
                 return;
             }
-            if (!CONFIG.ALLOWED_TYPES.includes(file.type)) {
+            // File type check disabled when ALLOWED_TYPES is empty to allow all files
+            if (CONFIG.ALLOWED_TYPES.length > 0 && !CONFIG.ALLOWED_TYPES.includes(file.type)) {
                 UI.toast(`${file.name}: file type not supported.`, 'warning');
                 rejected++;
                 return;
