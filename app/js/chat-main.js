@@ -215,11 +215,19 @@ function updateCharCount() {
         .addClass(len > MAX_CHARS ? "over" : len > 900 ? "warn" : "");
 }
 
+// function updateSendBtn() {
+//     const len       = ($msg.val() || "").trim().length;
+//     const over      = ($msg.val() || "").length > MAX_CHARS;
+//     const hasNumber = !!(chat.activePhone && chat.activePhone.resolvedNumber);
+//     $sendBtn.prop("disabled", !len || over || !chat.activePhone || !hasNumber);
+// }
+
 function updateSendBtn() {
     const len       = ($msg.val() || "").trim().length;
     const over      = ($msg.val() || "").length > MAX_CHARS;
     const hasNumber = !!(chat.activePhone && chat.activePhone.resolvedNumber);
-    $sendBtn.prop("disabled", !len || over || !chat.activePhone || !hasNumber);
+    const hasFiles  = !!(window.DevtacAttachments && window.DevtacAttachments.getFiles().length);
+    $sendBtn.prop("disabled", (!len && !hasFiles) || over || !chat.activePhone || !hasNumber);
 }
 
 // ── Phone picker ──────────────────────────────────────────────────────────────
@@ -1632,10 +1640,88 @@ function attachFilesToLogRecord(logId, files = []) {
 //     }
 // }
 
-// Newly Added 7-13-26  
+// Newly Added 7-13-26  old code
+// function sendMessage() {
+//     const text = ($msg.val() || "").trim();
+//     if (!text || !chat.activePhone) return;
+
+//     const tplId = chat.selectedTpl ? chat.selectedTpl.id : null;
+//     const lookupFieldsStr = (state.lookupFields || [])
+//         .map(f => f.fieldApiName + "|" + f.relatedModule)
+//         .join(",");
+
+//     const params = {
+//         record_id:             chat.recordId,
+//         template_id:           tplId || "",
+//         message:               text,
+//         channel:               CONFIG.CHANNEL,
+//         selected_module:       chat.module,
+//         selected_module_label: chat.module,
+//         phone_source:          chat.activePhone.source,
+//         selected_field:        chat.activePhone.fieldApiName,
+//         selected_field_label:  chat.activePhone.label,
+//         lookup_field:          chat.activePhone.lookupField  || "",
+//         lookup_field_label:    chat.activePhone.lookupLabel  || "",
+//         lookup_fields:         lookupFieldsStr,
+//         attachments:           [] // populated below if files exist
+//     };
+
+//     const files = window.DevtacAttachments ? window.DevtacAttachments.getFiles() : [];
+//     console.log(files);
+//     // Keep the original File objects for CRM attachFile after log_id is returned
+//     const filesToAttachToLog = [...files];
+
+//     const time = getNow();
+//     // newly added attachments 7-14-26
+//     const bubbleId = appendBubble({
+//         dir: "out",
+//         text,
+//         time,
+//         statusClass: "sending",
+//         retryParams: params,
+//         attachments: filesToAttachToLog
+//     });
+
+//     $sendBtn.prop("disabled", true);
+//     $msg.val("");
+//     clearTemplate();
+//     updateCharCount();
+
+//     // Read files as Base64 and include them in the payload before sending
+//     if (files.length > 0) {
+//         const promises = files.map(fileToBase64);
+
+//         Promise.all(promises).then((attachments) => {
+//             params.attachments = attachments;
+
+//             if (window.DevtacAttachments) {
+//                 window.DevtacAttachments.clear();
+//             }
+
+//             executeSend({
+//                 params,
+//                 bubbleId,
+//                 attachedFiles: filesToAttachToLog
+//             });
+//         });
+//     } else {
+//         executeSend({
+//             params,
+//             bubbleId,
+//             attachedFiles: filesToAttachToLog
+//         });
+//     }
+// }
+
+
+//New Added by Chan
+
 function sendMessage() {
-    const text = ($msg.val() || "").trim();
-    if (!text || !chat.activePhone) return;
+    const text  = ($msg.val() || "").trim();
+    const files = window.DevtacAttachments ? window.DevtacAttachments.getFiles() : [];
+
+    // now requires text OR files, not just text
+    if ((!text && !files.length) || !chat.activePhone || !chat.activePhone.resolvedNumber) return;
 
     const tplId = chat.selectedTpl ? chat.selectedTpl.id : null;
     const lookupFieldsStr = (state.lookupFields || [])
@@ -1655,16 +1741,14 @@ function sendMessage() {
         lookup_field:          chat.activePhone.lookupField  || "",
         lookup_field_label:    chat.activePhone.lookupLabel  || "",
         lookup_fields:         lookupFieldsStr,
-        attachments:           [] // populated below if files exist
+        attachments:           []
     };
 
-    const files = window.DevtacAttachments ? window.DevtacAttachments.getFiles() : [];
-    console.log(files);
-    // Keep the original File objects for CRM attachFile after log_id is returned
+    // ⚠️ remove the old duplicate `const files = window.DevtacAttachments...` line
+    // that used to appear here — it's declared above now.
     const filesToAttachToLog = [...files];
 
     const time = getNow();
-    // newly added attachments 7-14-26
     const bubbleId = appendBubble({
         dir: "out",
         text,
@@ -1679,29 +1763,14 @@ function sendMessage() {
     clearTemplate();
     updateCharCount();
 
-    // Read files as Base64 and include them in the payload before sending
     if (files.length > 0) {
-        const promises = files.map(fileToBase64);
-
-        Promise.all(promises).then((attachments) => {
+        Promise.all(files.map(fileToBase64)).then((attachments) => {
             params.attachments = attachments;
-
-            if (window.DevtacAttachments) {
-                window.DevtacAttachments.clear();
-            }
-
-            executeSend({
-                params,
-                bubbleId,
-                attachedFiles: filesToAttachToLog
-            });
+            if (window.DevtacAttachments) window.DevtacAttachments.clear();
+            executeSend({ params, bubbleId, attachedFiles: filesToAttachToLog });
         });
     } else {
-        executeSend({
-            params,
-            bubbleId,
-            attachedFiles: filesToAttachToLog
-        });
+        executeSend({ params, bubbleId, attachedFiles: filesToAttachToLog });
     }
 }
 
@@ -2002,6 +2071,20 @@ $area.on("click", ".retry-btn", function () {
 });
 
 $sendBtn.on("click", sendMessage);
+
+document.addEventListener("attachments-changed", (e) => {
+    updateSendBtn();
+
+    const { files, added } = e.detail || {};
+    if (!added || !files || !files.length) return;
+
+    if (!chat.activePhone || !chat.activePhone.resolvedNumber) {
+        console.warn("[DevtacMessaging] Cannot auto-send attachment: no active phone number.");
+        return;
+    }
+
+    sendMessage();
+});
 
 // ── Refresh ───────────────────────────────────────────────────────────────────
 $("#refreshBtn").on("click", () => {

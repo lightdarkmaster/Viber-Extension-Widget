@@ -235,24 +235,27 @@
 
             strip.querySelectorAll(".attachment-chip-remove").forEach((btn) => {
                 btn.addEventListener("click", () => {
-                    const idx = Number(btn.dataset.index);
-                    selectedFiles.splice(idx, 1);
-                    renderStrip();
-                    notifyChange();
+                const idx = Number(btn.dataset.index);
+                selectedFiles.splice(idx, 1);
+                renderStrip();
+                notifyChange({ added: false });
                 });
             });
         }
 
-        function notifyChange() {
-            // Let chat-main.js (or any other listener) know the attachment set changed
+        function notifyChange(meta = {}) {
             document.dispatchEvent(
-                new CustomEvent("attachments-changed", { detail: { files: selectedFiles.slice() } })
+                new CustomEvent("attachments-changed", { detail: { files: selectedFiles.slice(), ...meta } })
             );
         }
 
         function addFiles(fileList) {
             const incoming = Array.from(fileList);
+<<<<<<< HEAD
             const addedFiles = []; // track only the files that actually made it in
+=======
+            let addedCount = 0;
+>>>>>>> 631b4f1f8928eaf6320f4aa8540e888c579c93f0
 
             for (const file of incoming) {
                 if (selectedFiles.length >= MAX_FILES) {
@@ -264,6 +267,7 @@
                     continue;
                 }
                 selectedFiles.push(file);
+<<<<<<< HEAD
                 addedFiles.push(file);
             }
             renderStrip();
@@ -276,6 +280,12 @@
                     new CustomEvent("attachments-added", { detail: { files: addedFiles } })
                 );
             }
+=======
+                addedCount++;
+            }
+            renderStrip();
+            notifyChange({ added: addedCount > 0 }); // <-- flag real additions
+>>>>>>> 631b4f1f8928eaf6320f4aa8540e888c579c93f0
         }
 
         attachBtn.addEventListener("click", () => fileInput.click());
@@ -291,7 +301,7 @@
             clear: () => {
                 selectedFiles = [];
                 renderStrip();
-                notifyChange();
+                notifyChange({ added: false });
             },
         };
     })();
