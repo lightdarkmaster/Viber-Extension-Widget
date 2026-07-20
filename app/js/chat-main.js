@@ -1815,174 +1815,197 @@ function sendMessage() {
 // }
 
 // Newly Added 7-13-26
-function executeSend({ params, bubbleId, existingLogId, attachedFiles = [] }) {
+// function executeSend({ params, bubbleId, existingLogId, attachedFiles = [] }) {
+//     const body = existingLogId
+//         ? { ...params, existing_log_id: existingLogId }
+//         : { ...params };
+
+//     ZOHO.CRM.HTTP.post({
+//         url:     SEND_API_URL(chat.zapiKey),
+//         headers: { "Content-Type": "application/json" },
+//         body,
+//     })
+//     // Newly Added 7-14-26
+//     .then((res) => {
+//     const data = typeof res === "string"
+//         ? JSON.parse(res)
+//         : (
+//             res?.data
+//                 ? (
+//                     typeof res.data === "string"
+//                         ? JSON.parse(res.data)
+//                         : res.data
+//                 )
+//                 : res
+//         );
+
+//     const rawResult = data?.details?.output;
+
+//     const result = typeof rawResult === "string"
+//         ? JSON.parse(rawResult)
+//         : rawResult;
+
+//     const success =
+//         result?.success === true ||
+//         result?.success === "true";
+
+//     const CRMLogsCreated =
+//         result?.CRMLogsCreated === true ||
+//         result?.CRMLogsCreated === "true";
+
+//     const logId = result?.log_id || null;
+
+//     if (logId) {
+//         chat.seenIds.add(logId);
+//     }
+
+//     if (
+//         result?.new_balance !== undefined &&
+//         result?.new_balance !== null
+//     ) {
+//         chat.ViberCredits = result.new_balance;
+//         renderViberCredits();
+//     }
+
+//     const $bubble = $("#" + bubbleId);
+
+//     if (!success && params) {
+//         $bubble.attr(
+//             "data-retry-params",
+//             JSON.stringify(params)
+//         );
+//     } else {
+//         $bubble.removeAttr("data-retry-params");
+//     }
+
+//     if (
+//         success &&
+//         CRMLogsCreated &&
+//         logId &&
+//         attachedFiles &&
+//         attachedFiles.length > 0
+//     ) {
+//         return attachFilesToLogRecord(logId, attachedFiles)
+//             .then((attachResults) => {
+//                 console.log(
+//                     "[DevtacMessaging] Attach file results:",
+//                     attachResults
+//                 );
+
+//                 updateBubbleStatus(
+//                     bubbleId,
+//                     "sent",
+//                     logId
+//                 );
+//             })
+//             .catch((uploadError) => {
+//                 console.error(
+//                     "[DevtacMessaging] Message sent, but file upload to log failed:",
+//                     uploadError
+//                 );
+
+//                 updateBubbleStatus(
+//                     bubbleId,
+//                     "sent",
+//                     logId
+//                 );
+//             });
+//     }
+
+//     updateBubbleStatus(
+//         bubbleId,
+//         success ? "sent" : "failed",
+//         logId
+//     );
+// })
+//         .catch((err) => {
+//             console.error("[DevtacMessaging] Send failed:", err);
+
+//             const $bubble = $("#" + bubbleId);
+
+//             if (params) {
+//                 $bubble.attr("data-retry-params", JSON.stringify(params));
+//             }
+
+//             updateBubbleStatus(bubbleId, "failed");
+//         })
+//         .finally(() => updateSendBtn());
+// }
+
+
+
+async function executeSend({ params, bubbleId, existingLogId, attachedFiles = [] }) {
+    const $bubble = $("#" + bubbleId);
+
+    // Prepare payload
     const body = existingLogId
         ? { ...params, existing_log_id: existingLogId }
         : { ...params };
 
-    ZOHO.CRM.HTTP.post({
-        url:     SEND_API_URL(chat.zapiKey),
-        headers: { "Content-Type": "application/json" },
-        body,
-    })
-    // Newly Added 7-14-26
-    .then((res) => {
-    const data = typeof res === "string"
-        ? JSON.parse(res)
-        : (
-            res?.data
-                ? (
-                    typeof res.data === "string"
-                        ? JSON.parse(res.data)
-                        : res.data
-                )
-                : res
-        );
+    try {
+        // STEP 1: Await the API call synchronously
+        const res = await ZOHO.CRM.HTTP.post({
+            url: SEND_API_URL(chat.zapiKey),
+            headers: { "Content-Type": "application/json" },
+            body,
+        });
 
-    const rawResult = data?.details?.output;
+        // STEP 2: Safely parse the response
+        const data = typeof res === "string" 
+            ? JSON.parse(res) 
+            : (res?.data ? (typeof res.data === "string" ? JSON.parse(res.data) : res.data) : res);
 
-    const result = typeof rawResult === "string"
-        ? JSON.parse(rawResult)
-        : rawResult;
+        const rawResult = data?.details?.output;
+        const result = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
 
-    const success =
-        result?.success === true ||
-        result?.success === "true";
+        const success = result?.success === true || result?.success === "true";
+        const CRMLogsCreated = result?.CRMLogsCreated === true || result?.CRMLogsCreated === "true";
+        const logId = result?.log_id || null;
 
-    const CRMLogsCreated =
-        result?.CRMLogsCreated === true ||
-        result?.CRMLogsCreated === "true";
+        if (logId) {
+            chat.seenIds.add(logId);
+        }
 
-    const logId = result?.log_id || null;
+        // Update Viber credits if provided
+        if (result?.new_balance !== undefined && result?.new_balance !== null) {
+            chat.ViberCredits = result.new_balance;
+            renderViberCredits();
+        }
 
-    if (logId) {
-        chat.seenIds.add(logId);
-    }
+        // Store or remove retry parameters
+        if (!success && params) {
+            $bubble.attr("data-retry-params", JSON.stringify(params));
+        } else {
+            $bubble.removeAttr("data-retry-params");
+        }
 
-    if (
-        result?.new_balance !== undefined &&
-        result?.new_balance !== null
-    ) {
-        chat.ViberCredits = result.new_balance;
-        renderViberCredits();
-    }
-
-    const $bubble = $("#" + bubbleId);
-
-    if (!success && params) {
-        $bubble.attr(
-            "data-retry-params",
-            JSON.stringify(params)
-        );
-    } else {
-        $bubble.removeAttr("data-retry-params");
-    }
-
-    if (
-        success &&
-        CRMLogsCreated &&
-        logId &&
-        attachedFiles &&
-        attachedFiles.length > 0
-    ) {
-        return attachFilesToLogRecord(logId, attachedFiles)
-            .then((attachResults) => {
-                console.log(
-                    "[DevtacMessaging] Attach file results:",
-                    attachResults
-                );
-
-                updateBubbleStatus(
-                    bubbleId,
-                    "sent",
-                    logId
-                );
-            })
-            .catch((uploadError) => {
-                console.error(
-                    "[DevtacMessaging] Message sent, but file upload to log failed:",
-                    uploadError
-                );
-
-                updateBubbleStatus(
-                    bubbleId,
-                    "sent",
-                    logId
-                );
-            });
-    }
-
-    updateBubbleStatus(
-        bubbleId,
-        success ? "sent" : "failed",
-        logId
-    );
-})
-        // .then((res) => {
-        //     const data = typeof res === "string"
-        //         ? JSON.parse(res)
-        //         : (
-        //             res?.data
-        //                 ? (typeof res.data === "string" ? JSON.parse(res.data) : res.data)
-        //                 : res
-        //         );
-
-        //     const rawResult = data?.details?.output;
-        //     const result = typeof rawResult === "string"
-        //         ? JSON.parse(rawResult)
-        //         : rawResult;
-
-        //     const success = result?.success === true || result?.success === "true";
-
-        //     const logId = result?.log_id || null;
-
-        //     if (logId) {
-        //         chat.seenIds.add(logId);
-        //     }
-
-        //     if (result?.new_balance !== undefined && result?.new_balance !== null) {
-        //         chat.ViberCredits = result.new_balance;
-        //         renderViberCredits();
-        //     }
-
-        //     const $bubble = $("#" + bubbleId);
-
-        //     // Store retry params only if sending failed
-        //     if (!success && params) {
-        //         $bubble.attr("data-retry-params", JSON.stringify(params));
-        //     } else {
-        //         $bubble.removeAttr("data-retry-params");
-        //     }
-
-        //     // If message was sent and log record was created, attach uploaded files to the log record
-        //     if (success && logId && attachedFiles && attachedFiles.length > 0) {
-        //         return attachFilesToLogRecord(logId, attachedFiles)
-        //             .then((attachResults) => {
-        //                 console.log("[DevtacMessaging] Attach file results:", attachResults);
-        //                 updateBubbleStatus(bubbleId, "sent", logId);
-        //             })
-        //             .catch((uploadError) => {
-        //                 console.error("[DevtacMessaging] Message sent, but file upload to log failed:", uploadError);
-
-        //                 // Message was still sent, so mark bubble as sent even if CRM file attachment failed
-        //                 updateBubbleStatus(bubbleId, "sent", logId);
-        //             });
-        //     }
-
-        //     updateBubbleStatus(bubbleId, success ? "sent" : "failed", logId);
-        // })
-        .catch((err) => {
-            console.error("[DevtacMessaging] Send failed:", err);
-
-            const $bubble = $("#" + bubbleId);
-
-            if (params) {
-                $bubble.attr("data-retry-params", JSON.stringify(params));
+        // STEP 3: If successful, sequentially upload files BEFORE marking bubble as sent
+        if (success && CRMLogsCreated && logId && attachedFiles && attachedFiles.length > 0) {
+            try {
+                // Synchronously wait for file attachments to upload completely
+                const attachResults = await attachFilesToLogRecord(logId, attachedFiles);
+                console.log("[DevtacMessaging] Attach file results:", attachResults);
+            } catch (uploadError) {
+                console.error("[DevtacMessaging] Message sent, but file upload to log failed:", uploadError);
             }
+        }
 
-            updateBubbleStatus(bubbleId, "failed");
-        })
-        .finally(() => updateSendBtn());
+        // STEP 4: Update UI state after all previous steps are finished
+        updateBubbleStatus(bubbleId, success ? "sent" : "failed", logId);
+
+    } catch (err) {
+        // Handle network/execution errors
+        console.error("[DevtacMessaging] Send failed:", err);
+
+        if (params) {
+            $bubble.attr("data-retry-params", JSON.stringify(params));
+        }
+
+        updateBubbleStatus(bubbleId, "failed");
+    } finally {
+        // Re-enable send button
+        updateSendBtn();
+    }
 }
 
 // ── Retry handler (delegated) ─────────────────────────────────────────────────
