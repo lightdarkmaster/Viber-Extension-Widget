@@ -534,6 +534,100 @@ function isImageFile(filename) {
 // }
 
 // newly and revised added logic  7-14-26
+
+
+
+
+function getFileIconMeta(fileName = "", fileType = "") {
+    const ext = (fileName.split(".").pop() || "").toLowerCase();
+
+    const byExt = {
+        pdf:  { label: "PDF",  color: "#E2574C" },
+        doc:  { label: "DOC",  color: "#2B579A" },
+        docx: { label: "DOC",  color: "#2B579A" },
+        xls:  { label: "XLS",  color: "#1D6F42" },
+        xlsx: { label: "XLS",  color: "#1D6F42" },
+        csv:  { label: "CSV",  color: "#1D6F42" },
+        ppt:  { label: "PPT",  color: "#D24726" },
+        pptx: { label: "PPT",  color: "#D24726" },
+        zip:  { label: "ZIP",  color: "#8A6D3B" },
+        rar:  { label: "RAR",  color: "#8A6D3B" },
+        "7z": { label: "7Z",   color: "#8A6D3B" },
+        mp3:  { label: "MP3",  color: "#8E44AD" },
+        wav:  { label: "WAV",  color: "#8E44AD" },
+        ogg:  { label: "OGG",  color: "#8E44AD" },
+        mp4:  { label: "MP4",  color: "#2980B9" },
+        mov:  { label: "MOV",  color: "#2980B9" },
+        avi:  { label: "AVI",  color: "#2980B9" },
+        webm: { label: "WEBM", color: "#2980B9" },
+        txt:  { label: "TXT",  color: "#607D8B" },
+        md:   { label: "MD",   color: "#607D8B" },
+        json: { label: "JSON", color: "#B7962B" },
+        xml:  { label: "XML",  color: "#B7962B" },
+        js:   { label: "JS",   color: "#B7962B" },
+        ts:   { label: "TS",   color: "#3178C6" },
+        html: { label: "HTML", color: "#E44D26" },
+        css:  { label: "CSS",  color: "#2965F1" },
+    };
+
+    if (byExt[ext]) return byExt[ext];
+
+    // Fallback by MIME prefix when extension is missing/unknown
+    if (fileType.startsWith("video/")) return { label: "VID", color: "#2980B9" };
+    if (fileType.startsWith("audio/")) return { label: "AUD", color: "#8E44AD" };
+    if (fileType === "application/pdf") return { label: "PDF", color: "#E2574C" };
+    if (fileType.includes("zip") || fileType.includes("compressed")) {
+        return { label: "ZIP", color: "#8A6D3B" };
+    }
+
+    return { label: ext ? ext.slice(0, 4).toUpperCase() : "FILE", color: "#78829D" };
+}
+
+function getFileIconSvg(fileName, fileType) {
+    const { label, color } = getFileIconMeta(fileName, fileType);
+
+    return `
+        <svg
+            class="chat-doc-icon-svg"
+            width="34"
+            height="34"
+            viewBox="0 0 40 40"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+        >
+            <path
+                d="M9 3.5H23.5L31 11V34.5C31 35.6 30.1 36.5 29 36.5H9C7.9 36.5 7 35.6 7 34.5V5.5C7 4.4 7.9 3.5 9 3.5Z"
+                fill="#F5F6F8"
+                stroke="#C7CCD4"
+                stroke-width="1.2"
+            />
+            <path
+                d="M23.5 3.5L31 11H25.5C24.4 11 23.5 10.1 23.5 9V3.5Z"
+                fill="#DEE2E8"
+            />
+            <rect
+                x="7"
+                y="26"
+                width="24"
+                height="10.5"
+                rx="2"
+                fill="${color}"
+            />
+            <text
+                x="19"
+                y="33.4"
+                text-anchor="middle"
+                font-family="Arial, Helvetica, sans-serif"
+                font-size="${label.length > 3 ? 7 : 8.5}"
+                font-weight="700"
+                fill="#FFFFFF"
+                letter-spacing="0.3"
+            >${label}</text>
+        </svg>
+    `;
+}
+
 function buildAttachmentHtml(attachments = []) {
     if (
         !Array.isArray(attachments) ||
@@ -576,8 +670,7 @@ function buildAttachmentHtml(attachments = []) {
         if (isImage && previewUrl) {
             return `
                 <div class="chat-attachment-card image-preview">
-                    <a
-                        href="${previewUrl}"
+                        <a href="${previewUrl}"
                         target="_blank"
                         rel="noopener noreferrer"
                         title="View image"
@@ -601,8 +694,8 @@ function buildAttachmentHtml(attachments = []) {
                 ${
                     previewUrl
                         ? `
-                            <a
-                                href="${previewUrl}"
+                            
+                                <a href="${previewUrl}"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 class="chat-doc-link"
@@ -612,18 +705,20 @@ function buildAttachmentHtml(attachments = []) {
                         : `<div class="chat-doc-link">`
                 }
 
-                    <div class="chat-doc-icon">
-                        📎
-                    </div>
+                    <div class="chat-doc-row">
+                        <span class="chat-doc-icon">
+                            ${getFileIconSvg(fileName, fileType)}
+                        </span>
 
-                    <div class="chat-doc-meta">
                         <span
                             class="chat-doc-name"
                             title="${escapeHtml(fileName)}"
                         >
                             ${escapeHtml(fileName)}
                         </span>
+                    </div>
 
+                    <div class="chat-doc-meta">
                         <span class="chat-doc-download-lbl">
                             ${
                                 previewUrl
@@ -1815,174 +1910,197 @@ function sendMessage() {
 // }
 
 // Newly Added 7-13-26
-function executeSend({ params, bubbleId, existingLogId, attachedFiles = [] }) {
+// function executeSend({ params, bubbleId, existingLogId, attachedFiles = [] }) {
+//     const body = existingLogId
+//         ? { ...params, existing_log_id: existingLogId }
+//         : { ...params };
+
+//     ZOHO.CRM.HTTP.post({
+//         url:     SEND_API_URL(chat.zapiKey),
+//         headers: { "Content-Type": "application/json" },
+//         body,
+//     })
+//     // Newly Added 7-14-26
+//     .then((res) => {
+//     const data = typeof res === "string"
+//         ? JSON.parse(res)
+//         : (
+//             res?.data
+//                 ? (
+//                     typeof res.data === "string"
+//                         ? JSON.parse(res.data)
+//                         : res.data
+//                 )
+//                 : res
+//         );
+
+//     const rawResult = data?.details?.output;
+
+//     const result = typeof rawResult === "string"
+//         ? JSON.parse(rawResult)
+//         : rawResult;
+
+//     const success =
+//         result?.success === true ||
+//         result?.success === "true";
+
+//     const CRMLogsCreated =
+//         result?.CRMLogsCreated === true ||
+//         result?.CRMLogsCreated === "true";
+
+//     const logId = result?.log_id || null;
+
+//     if (logId) {
+//         chat.seenIds.add(logId);
+//     }
+
+//     if (
+//         result?.new_balance !== undefined &&
+//         result?.new_balance !== null
+//     ) {
+//         chat.ViberCredits = result.new_balance;
+//         renderViberCredits();
+//     }
+
+//     const $bubble = $("#" + bubbleId);
+
+//     if (!success && params) {
+//         $bubble.attr(
+//             "data-retry-params",
+//             JSON.stringify(params)
+//         );
+//     } else {
+//         $bubble.removeAttr("data-retry-params");
+//     }
+
+//     if (
+//         success &&
+//         CRMLogsCreated &&
+//         logId &&
+//         attachedFiles &&
+//         attachedFiles.length > 0
+//     ) {
+//         return attachFilesToLogRecord(logId, attachedFiles)
+//             .then((attachResults) => {
+//                 console.log(
+//                     "[DevtacMessaging] Attach file results:",
+//                     attachResults
+//                 );
+
+//                 updateBubbleStatus(
+//                     bubbleId,
+//                     "sent",
+//                     logId
+//                 );
+//             })
+//             .catch((uploadError) => {
+//                 console.error(
+//                     "[DevtacMessaging] Message sent, but file upload to log failed:",
+//                     uploadError
+//                 );
+
+//                 updateBubbleStatus(
+//                     bubbleId,
+//                     "sent",
+//                     logId
+//                 );
+//             });
+//     }
+
+//     updateBubbleStatus(
+//         bubbleId,
+//         success ? "sent" : "failed",
+//         logId
+//     );
+// })
+//         .catch((err) => {
+//             console.error("[DevtacMessaging] Send failed:", err);
+
+//             const $bubble = $("#" + bubbleId);
+
+//             if (params) {
+//                 $bubble.attr("data-retry-params", JSON.stringify(params));
+//             }
+
+//             updateBubbleStatus(bubbleId, "failed");
+//         })
+//         .finally(() => updateSendBtn());
+// }
+
+
+
+async function executeSend({ params, bubbleId, existingLogId, attachedFiles = [] }) {
+    const $bubble = $("#" + bubbleId);
+
+    // Prepare payload
     const body = existingLogId
         ? { ...params, existing_log_id: existingLogId }
         : { ...params };
 
-    ZOHO.CRM.HTTP.post({
-        url:     SEND_API_URL(chat.zapiKey),
-        headers: { "Content-Type": "application/json" },
-        body,
-    })
-    // Newly Added 7-14-26
-    .then((res) => {
-    const data = typeof res === "string"
-        ? JSON.parse(res)
-        : (
-            res?.data
-                ? (
-                    typeof res.data === "string"
-                        ? JSON.parse(res.data)
-                        : res.data
-                )
-                : res
-        );
+    try {
+        // STEP 1: Await the API call synchronously
+        const res = await ZOHO.CRM.HTTP.post({
+            url: SEND_API_URL(chat.zapiKey),
+            headers: { "Content-Type": "application/json" },
+            body,
+        });
 
-    const rawResult = data?.details?.output;
+        // STEP 2: Safely parse the response
+        const data = typeof res === "string" 
+            ? JSON.parse(res) 
+            : (res?.data ? (typeof res.data === "string" ? JSON.parse(res.data) : res.data) : res);
 
-    const result = typeof rawResult === "string"
-        ? JSON.parse(rawResult)
-        : rawResult;
+        const rawResult = data?.details?.output;
+        const result = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
 
-    const success =
-        result?.success === true ||
-        result?.success === "true";
+        const success = result?.success === true || result?.success === "true";
+        const CRMLogsCreated = result?.CRMLogsCreated === true || result?.CRMLogsCreated === "true";
+        const logId = result?.log_id || null;
 
-    const CRMLogsCreated =
-        result?.CRMLogsCreated === true ||
-        result?.CRMLogsCreated === "true";
+        if (logId) {
+            chat.seenIds.add(logId);
+        }
 
-    const logId = result?.log_id || null;
+        // Update Viber credits if provided
+        if (result?.new_balance !== undefined && result?.new_balance !== null) {
+            chat.ViberCredits = result.new_balance;
+            renderViberCredits();
+        }
 
-    if (logId) {
-        chat.seenIds.add(logId);
-    }
+        // Store or remove retry parameters
+        if (!success && params) {
+            $bubble.attr("data-retry-params", JSON.stringify(params));
+        } else {
+            $bubble.removeAttr("data-retry-params");
+        }
 
-    if (
-        result?.new_balance !== undefined &&
-        result?.new_balance !== null
-    ) {
-        chat.ViberCredits = result.new_balance;
-        renderViberCredits();
-    }
-
-    const $bubble = $("#" + bubbleId);
-
-    if (!success && params) {
-        $bubble.attr(
-            "data-retry-params",
-            JSON.stringify(params)
-        );
-    } else {
-        $bubble.removeAttr("data-retry-params");
-    }
-
-    if (
-        success &&
-        CRMLogsCreated &&
-        logId &&
-        attachedFiles &&
-        attachedFiles.length > 0
-    ) {
-        return attachFilesToLogRecord(logId, attachedFiles)
-            .then((attachResults) => {
-                console.log(
-                    "[DevtacMessaging] Attach file results:",
-                    attachResults
-                );
-
-                updateBubbleStatus(
-                    bubbleId,
-                    "sent",
-                    logId
-                );
-            })
-            .catch((uploadError) => {
-                console.error(
-                    "[DevtacMessaging] Message sent, but file upload to log failed:",
-                    uploadError
-                );
-
-                updateBubbleStatus(
-                    bubbleId,
-                    "sent",
-                    logId
-                );
-            });
-    }
-
-    updateBubbleStatus(
-        bubbleId,
-        success ? "sent" : "failed",
-        logId
-    );
-})
-        // .then((res) => {
-        //     const data = typeof res === "string"
-        //         ? JSON.parse(res)
-        //         : (
-        //             res?.data
-        //                 ? (typeof res.data === "string" ? JSON.parse(res.data) : res.data)
-        //                 : res
-        //         );
-
-        //     const rawResult = data?.details?.output;
-        //     const result = typeof rawResult === "string"
-        //         ? JSON.parse(rawResult)
-        //         : rawResult;
-
-        //     const success = result?.success === true || result?.success === "true";
-
-        //     const logId = result?.log_id || null;
-
-        //     if (logId) {
-        //         chat.seenIds.add(logId);
-        //     }
-
-        //     if (result?.new_balance !== undefined && result?.new_balance !== null) {
-        //         chat.ViberCredits = result.new_balance;
-        //         renderViberCredits();
-        //     }
-
-        //     const $bubble = $("#" + bubbleId);
-
-        //     // Store retry params only if sending failed
-        //     if (!success && params) {
-        //         $bubble.attr("data-retry-params", JSON.stringify(params));
-        //     } else {
-        //         $bubble.removeAttr("data-retry-params");
-        //     }
-
-        //     // If message was sent and log record was created, attach uploaded files to the log record
-        //     if (success && logId && attachedFiles && attachedFiles.length > 0) {
-        //         return attachFilesToLogRecord(logId, attachedFiles)
-        //             .then((attachResults) => {
-        //                 console.log("[DevtacMessaging] Attach file results:", attachResults);
-        //                 updateBubbleStatus(bubbleId, "sent", logId);
-        //             })
-        //             .catch((uploadError) => {
-        //                 console.error("[DevtacMessaging] Message sent, but file upload to log failed:", uploadError);
-
-        //                 // Message was still sent, so mark bubble as sent even if CRM file attachment failed
-        //                 updateBubbleStatus(bubbleId, "sent", logId);
-        //             });
-        //     }
-
-        //     updateBubbleStatus(bubbleId, success ? "sent" : "failed", logId);
-        // })
-        .catch((err) => {
-            console.error("[DevtacMessaging] Send failed:", err);
-
-            const $bubble = $("#" + bubbleId);
-
-            if (params) {
-                $bubble.attr("data-retry-params", JSON.stringify(params));
+        // STEP 3: If successful, sequentially upload files BEFORE marking bubble as sent
+        if (success && CRMLogsCreated && logId && attachedFiles && attachedFiles.length > 0) {
+            try {
+                // Synchronously wait for file attachments to upload completely
+                const attachResults = await attachFilesToLogRecord(logId, attachedFiles);
+                console.log("[DevtacMessaging] Attach file results:", attachResults);
+            } catch (uploadError) {
+                console.error("[DevtacMessaging] Message sent, but file upload to log failed:", uploadError);
             }
+        }
 
-            updateBubbleStatus(bubbleId, "failed");
-        })
-        .finally(() => updateSendBtn());
+        // STEP 4: Update UI state after all previous steps are finished
+        updateBubbleStatus(bubbleId, success ? "sent" : "failed", logId);
+
+    } catch (err) {
+        // Handle network/execution errors
+        console.error("[DevtacMessaging] Send failed:", err);
+
+        if (params) {
+            $bubble.attr("data-retry-params", JSON.stringify(params));
+        }
+
+        updateBubbleStatus(bubbleId, "failed");
+    } finally {
+        // Re-enable send button
+        updateSendBtn();
+    }
 }
 
 // ── Retry handler (delegated) ─────────────────────────────────────────────────
