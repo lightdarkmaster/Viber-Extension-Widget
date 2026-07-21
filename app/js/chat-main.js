@@ -215,13 +215,6 @@ function updateCharCount() {
         .addClass(len > MAX_CHARS ? "over" : len > 900 ? "warn" : "");
 }
 
-// function updateSendBtn() {
-//     const len       = ($msg.val() || "").trim().length;
-//     const over      = ($msg.val() || "").length > MAX_CHARS;
-//     const hasNumber = !!(chat.activePhone && chat.activePhone.resolvedNumber);
-//     $sendBtn.prop("disabled", !len || over || !chat.activePhone || !hasNumber);
-// }
-
 function updateSendBtn() {
     const len       = ($msg.val() || "").trim().length;
     const over      = ($msg.val() || "").length > MAX_CHARS;
